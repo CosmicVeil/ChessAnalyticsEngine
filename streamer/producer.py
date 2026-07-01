@@ -26,20 +26,6 @@ if __name__ == '__main__':
             print("Produced event to topic {topic}: key = {key:12} value = {value:12}".format(
                 topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
 
-    # Produce data by selecting random values from these lists.
-    # topic = "purchases"
-    # user_ids = ['eabara', 'jsmith', 'sgarcia', 'jbernard', 'htanaka', 'awalther']
-    # products = ['book', 'alarm clock', 't-shirts', 'gift card', 'batteries']
-    #
-    # count = 0
-    # for _ in range(10):
-    #     user_id = choice(user_ids)
-    #     product = choice(products)
-    #     producer.produce(topic, product, user_id, callback=delivery_callback)
-    #     count += 1
-    #
-    #     # Trigger any outstanding delivery report callbacks.
-    #     producer.poll(0)
     producer.produce("chess-moves")
 
     # Block until the messages are delivered.

@@ -1,0 +1,454 @@
+[Event "MCC CFC Online Rapid 6"]
+[Site "https://lichess.org/cmafwoNh"]
+[Date "2020.07.18"]
+[White "ItalianMachine"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2342"]
+[WhiteTitle "NM"]
+[BlackElo "1774"]
+[TimeControl "900+10"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "D37"]
+[Opening "Queen's Gambit Declined: Three Knights Variation"]
+[StudyName "My Best Games"]
+[ChapterName "ItalianMachine - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/Z6vAXe8Y"]
+
+1. d4 Nf6 2. Nf3 e6 3. c4 d5 4. Nc3 { D37 Queen's Gambit Declined: Three Knights Variation } 4... Bd7?! { (-0.08 → 0.78) Inaccuracy. dxc4 was best. } { A key to beating higher-rated players is to move them out off theory quickly. } (4... dxc4 5. e4 Bb4 6. Bg5 c5 7. Bxc4 h6 8. Bxf6 Qxf6 9. O-O) 5. cxd5 exd5 6. Bg5?! { (0.95 → 0.40) Inaccuracy. Qb3 was best. } (6. Qb3 { Dyshkant, Fedor Nikolaevich - Baroin, Bernard, 1/2-1/2, WS/CCM/B/1, 2019, https://lichess.org/GoBdLkfa } 6... c5 7. Bg5 Nc6 8. Bxf6 gxf6 9. e3 c4 10. Qc2 Bg4) 6... Be7? { (0.40 → 1.80) Mistake. c6 was best. } { Bxf6 just wins the d5 pawn. } { [%csl Bf6,Rd5][%cal Bg5f6,Ye7f6] } (6... c6 { Moving into a Semi-Slav like position } 7. e3 Bf5 8. Bd3 Bxd3 9. Qxd3 Be7 10. Bxf6 Bxf6 11. e4) 7. Qb3?! { (1.80 → 0.92) Inaccuracy. Bxf6 was best. } { Missing it. } (7. Bxf6 Bxf6 8. Nxd5 Bg4 9. Nxf6+ Qxf6 10. e3 Nd7 11. Rc1 Bxf3 12. Qxf3 Qxf3 13. gxf3 c6) 7... Bc6 { I'm safe for now, but my opponent has the initiative. } 8. Ne5 h6 { Trying to dislodge the bishop. } 9. Bh4?! { (1.01 → 0.35) Inaccuracy. Nxc6 was best. } (9. Nxc6 Nxc6 10. Bxf6 Bxf6 11. Qxb7) 9... Nfd7? { (0.35 → 1.56) Mistake. Nbd7 was best. } { Trying to free up my position by trading. } { [%csl Bd7][%cal Bf6d7] } (9... Nbd7 10. Bxf6 Bxf6 11. Nf3 O-O 12. e3 Nb6 13. Bd3 a5 14. a4 Be8 15. O-O c6 16. Ne5) 10. Nxd5?? { (1.56 → -2.03) Blunder. Nxc6 was best. } { A game losing blunder. My opponent is trying to end the game with sacrifices, though there are none. } (10. Nxc6 bxc6 11. Bxe7 Qxe7 12. e3 O-O 13. Rc1 Qd6 14. Bd3 Nf6 15. Qc2 Nbd7 16. O-O Rab8) 10... Bxh4 { [%csl Bf7,Yc7,Yc6][%cal Bb3f7,Be5f7,Yd5c7,Ye5c6] } 11. Nxc7+?? { (-2.15 → -7.61) Blunder. Nxc6 was best. } { After Qxc7 I get the d8 square, saving my king. } (11. Nxc6 bxc6 12. Nc3 c5 13. Qb7 cxd4 14. Qxa8 dxc3 15. Qe4+ Be7 16. bxc3 Nc5 17. Qe3 O-O) 11... Qxc7 12. Qxf7+ Kd8 13. Ng6 { Trying to win some material and continue the attack } 13... Qa5+! { Here I found a combination to trade queen's leaving me 3 pieces up. } 14. Kd1 Qa4+! 15. Kc1 Be4! { My favorite move, threating to checkmate or take the knight on g6. } 16. b3 Qc6+ { White resigns. } { And now I will be three pieces up. } 17. Qc4 Qxc4+ 18. bxc4 Bxg6 19. g3 Bf6 20. e3 Be4 21. Rg1 Nc5 22. Be2 Nd3+ 23. Bxd3 Bxd3 24. c5 b6 25. Kd2 Bg6 26. Rac1 bxc5 27. Rxc5 Nd7 28. Rd5 Ke7 29. Rc1 Rac8 30. Rxc8 Rxc8 31. f4 Rc2+ 32. Kd1 Rxh2 33. f5 Bh5+ 34. Kc1 Bg5 35. Kb1 Bxe3 36. f6+ gxf6 37. Rb5 Bg6+ 38. Ka1 Bxd4+ 39. Rb2 Bxb2# 0-1
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/Mi2RRDZi"]
+[Date "2020.07.17"]
+[White "Brap69"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2073"]
+[BlackElo "2023"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "C11"]
+[Opening "French Defense: Classical Variation, Burn Variation, Morozevich Line"]
+[StudyName "My Best Games"]
+[ChapterName "Brap69 - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/pYo2x74y"]
+
+1. d4 e6 2. e4 d5 3. Nc3 Nf6 4. Bg5 dxe4 5. Nxe4 Be7 6. Bxf6 gxf6 { C11 French
+Defense: Classical Variation, Burn Variation, Morozevich Line } 7. Nf3 a6 8. c3 b5 9. Bd3 Bb7 10. O-O f5 11. Nc5 Bxc5 12. dxc5 Rg8 { Preparing the sacrifice } 13. Qe2 Rxg2+!! { The bishop on b7 is the key to the sacrifice working } 14. Kxg2 (14. Kh1! Rg4 15. Rg1 Qd5! 16. Rxg4 fxg4 { [%csl Yf3,Bh1][%cal Yg4f3,Bb7h1] }) 14... Qg5+! { Utilizing the pin on the knight } 15. Kh1 Qg4 { A quiet move, threatening to win the knight on f3. White has no defense. } 16. Bxb5+ axb5 17. Qxb5+ Bc6 { White resigns. } { Losing the queen and the game. } 18. Qxc6+ Nxc6 19. Ne1 Qe2 20. Ng2 Qxb2 21. Rab1 Qxc3 22. Rbc1 Qf3 23. Rc2 Nd4 24. Rd2 Ne2 25. Rc2 O-O-O 26. a4 Rg8 27. Rg1 Nxg1 28. h3 Qxg2# 0-1
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/VSYfv4MW"]
+[Date "2020.06.16"]
+[White "JFCS"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2143"]
+[BlackElo "2068"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "A45"]
+[Opening "Indian Defense: Accelerated London System"]
+[StudyName "My Best Games"]
+[ChapterName "JFCS - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/oDDeXhu7"]
+
+1. d4 Nf6 { A45 Indian Game } 2. Bf4 d5 3. e3 Bf5 4. c4 e6 5. Qb3 b6 6. Nc3 c5?? { (0.15 → 2.71) Blunder. Bd6 was best. } (6... Bd6 7. Bxd6 Qxd6 8. Nge2 O-O 9. Ng3 Bg6 10. Be2 Nc6 11. cxd5) 7. dxc5?! { (2.71 → 1.56) Inaccuracy. Nb5 was best. } (7. Nb5 Be7 8. Nc7+ Kf8 9. Nxa8 Na6 10. a3 Qxa8 11. cxd5 Nxd5) 7... Bxc5 8. cxd5 exd5 9. g3?? { (1.25 → -0.63) Blunder. Bb5+ was best. } (9. Bb5+ Nbd7 10. Nf3 Be6 11. Qc2 Qc8 12. Rd1 O-O 13. O-O a6 14. Be2 Qb7 15. Nd4 Rfc8) 9... O-O 10. Bg2? { (-0.41 → -1.83) Mistake. Nf3 was best. } (10. Nf3 Nc6 11. Be2 Qe7 12. O-O Rad8 13. Rfe1 Be6 14. Qa4 d4 15. Qxc6 dxc3 16. bxc3 Bd5) 10... Nc6 11. Nxd5?! { (-1.81
+→ -2.62) Inaccuracy. a3 was best. } (11. a3 Qe8) 11... Nxd5 12. Qxd5?! { (-2.69 →
+-4.00) Inaccuracy. Bxd5 was best. } (12. Bxd5 Nb4 13. e4 Qe7 14. Kf1 Nxd5 15. exf5 Nxf4 16. gxf4 Qe4 17. Qf3 Qxf5 18. Re1 Rad8) 12... Bb4+?? { (-4.00 → -0.49)
+Blunder. Qf6 was best. } (12... Qf6 13. Ne2 Nb4 14. Be5 Qxe5 15. Qxe5 Nd3+ 16. Kd2 Nxe5 17. Bxa8 Rxa8 18. Nd4 Bb4+ 19. Kd1) 13. Ke2?? { (-0.49 → -4.17) Blunder.
+Kf1 was best. } (13. Kf1 Qf6) 13... Bg4+?? { (-4.17 → 0.13) Blunder. Qf6 was
+best. } (13... Qf6) 14. Kf1 Qc8? { (0.12 → 1.15) Mistake. Rc8 was best. } (14... Rc8 15. Qxd8 Rfxd8 16. Bf3 Be6 17. Ne2 Bh3+ 18. Bg2 Bxg2+ 19. Kxg2 Rd2 20. Nd4 Nxd4 21. exd4) 15. Qxc6?? { (1.15 → -3.50) Blunder. Ne2 was best. } (15. Ne2 Qa6 16. Bf3 Bxf3 17. Qxf3 Rac8 18. Kg2 Rfd8 19. a3 Be7 20. Rhd1 Bf6 21. Rac1 h6) 15... Qa6+ 16. Ne2 Qxe2+ 17. Kg1 Be1?! { (-2.74 → -1.89) Inaccuracy. Rac8 was
+best. } (17... Rac8 18. Qe4) 18. h3 Rac8 19. Qe4 Rc4 20. Qd5?? { (-2.39 → -8.76)
+Blunder. Rxe1 was best. } (20. Rxe1 Qxe1+ 21. Kh2 Qe2 22. Qb1 Bf3 23. Qe1 Rc2 24. Qxe2 Bxe2 25. Bd5 Rd8 26. Bb3 Rxb2) 20... Rxf4 21. gxf4? { (-8.82 → Mate in 4)
+Checkmate is now unavoidable. Kh2 was best. } (21. Kh2 Qxf2) 21... Qxf2+ 22. Kh2 Qg3+ 23. Kg1 Qxe3+ 24. Kh2 Bg3# { Black wins by checkmate. } { [%csl Bg1,Yh2][%cal Be3g1,Yg3h2] } 0-1
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/Dpjd3xBB"]
+[Date "2020.07.31"]
+[White "mohan_dixit"]
+[Black "ChessLogic0906"]
+[Result "1-0"]
+[WhiteElo "2006"]
+[BlackElo "2161"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "B18"]
+[Opening "Caro-Kann Defense: Classical Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - ChessLogic0906"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/XU1VPhgm"]
+
+1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Bf5 { B18 Caro-Kann Defense: Classical Variation } 5. Ng3 Bg6 6. Nf3 Nd7 7. Bc4 e6 8. c3 Bd6 9. Qe2 Ngf6 10. O-O O-O (10... Qb6? 11. Re1 a6?? 12. Bxe6!! fxe6? 13. Qxe6+ Kd8 14. Qxd6) 11. Re1 c5 12. a4 cxd4 13. cxd4 Nb6 14. Bb3 Nbd5 15. Bg5 Qb6 16. Bxf6 Nxf6 17. Ba2 Rfd8 18. a5 Qxa5 19. Bxe6 Qb6 20. Bf5 Bxg3 21. Bxg6 Bxh2+ 22. Kxh2 hxg6 23. Qd2 Rd7 24. Re2 Rad8 25. Rae1 Qc7+ 26. Kg1 Qb8 27. Qb4 Nd5 28. Qb3 Nf4 29. Re3 Ne6 30. Rxe6 fxe6 31. Qxe6+ Rf7 { [%cal Gf3e5] } 32. Ng5 (32. Ne5 Qc7) 32... Qc7 (32... Qf4 33. Nxf7 Qxf7) 33. Qh3 { Black resigns. } 33... Rfd7 34. Qh7+ Kf8 35. Qh8# { [%csl Be8,Rf8,Yf7][%cal Be1e8,Rh8f8,Yg5f7] } 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/kb0oyLus"]
+[Date "2020.06.23"]
+[White "mohan_dixit"]
+[Black "LePawnJames"]
+[Result "1-0"]
+[WhiteElo "2059"]
+[BlackElo "2103"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "B92"]
+[Opening "Sicilian Defense: Najdorf Variation, Opocensky Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - LePawnJames"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/A5kxj0JW"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be2 { B92 Sicilian
+Defense: Najdorf Variation, Opocensky Variation } 6... e5 7. Nb3 Be7 8. Be3 Be6 9. O-O Nbd7 10. f4 exf4 11. Bxf4 Qb6+ 12. Kh1 O-O 13. Qd2 Ng4?? { (0.32 → 3.58)
+Blunder. Rfe8 was best. } (13... Rfe8 14. Rad1) 14. Bxg4 Bxg4 15. Nd5 Qd8 16. Nxe7+ Qxe7 { [%csl Bd6,Yf8][%cal Bf4d6,Yd6f8] } 17. Bxd6 Qxe4 18. Bxf8 Nxf8 19. Rae1 Qc6 20. Qf4 Bh5?! { (2.92 → 4.46)
+Inaccuracy. Be6 was best. } (20... Be6 21. Nd4 Qd7 22. Nxe6 Nxe6 23. Rd1 Qe8 24. Qe4 Qe7 25. Rd2 Qc7 26. Rfd1 Nf8 27. g3) 21. Nd4 Qb6 22. Re7 Qb4 23. Rxf7 Bxf7 24. Qxf7+ Kh8 25. Nf5 Qxb2 26. Nd6?? { (4.00 → 1.78) Blunder. c3 was best. } (26. c3 Qxc3 27. Nd6 h6 28. Qxb7 Qd3 29. Rg1 Qxd6 30. Qxa8 Qf6 31. a4 Kg8 32. Rc1 Qf4) 26... Ng6?? { (1.78 → 14.46) Blunder. h6 was best. } (26... h6 27. h3 (27. Ne8)) 27. Ne8 h6 28. Qxg6 { Black resigns. } 28... Rxe8 29. Qxe8+ Kh7 30. Qe4+ Kg8 31. Qe6+ Kh7 32. Qf5+ Kh8 33. Re1 Qb5 34. Qg6 b6 35. Re8+ Qxe8 36. Qxe8+ Kh7 37. Qe4+ Kg8 38. Qe6+ Kh7 39. Qxb6 Kg8 40. Qxa6 Kf7 41. Qb7+ Kg6 42. a4 Kf6 43. a5 Kg6 44. a6 Kg5 45. a7 Kg6 46. a8=Q Kf5 47. Qxg7 Ke6 48. Qe4+ Kd6 49. Qge7# 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/aYN0Mtbs"]
+[Date "2021.01.16"]
+[White "Shrihari28"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2207"]
+[BlackElo "2033"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "C05"]
+[Opening "French Defense: Tarrasch Variation, Closed Variation"]
+[StudyName "My Best Games"]
+[ChapterName "Shrihari28 - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/WVDOqdxT"]
+
+1. e4 e6 2. d4 d5 3. Nd2 Nf6 { C05 French Defense: Tarrasch Variation, Closed Variation } 4. e5 Nfd7 5. Ngf3 c5 6. c3 Nc6 7. Be2?! { (0.50 → -0.09) Inaccuracy. Bd3 was best. } (7. Bd3 Be7 8. O-O g5 9. dxc5 Nxc5 10. Bb5 Bd7 11. Bxc6 bxc6) 7... cxd4 8. cxd4 f6 9. exf6 Nxf6 10. O-O Bd6 11. Bd3 O-O 12. Re1 Qc7 13. Nf1 Bd7 14. Ng3?! { (0.58 → -0.26) Inaccuracy. Be3 was best. } (14. Be3) 14... Rae8?! { (-0.26 → 0.39) Inaccuracy. e5 was best. } (14... e5 15. dxe5 Nxe5 16. Be3 Nxf3+ 17. gxf3 Bc6 18. Bd4 Rae8 19. Rxe8 Rxe8 20. Bxf6 gxf6 21. Bb5) 15. Bg5?! { (0.39 → -0.59) Inaccuracy. Be3 was best. } (15. Be3 e5 16. Nxe5 Nxe5 17. dxe5 Bxe5 18. Rc1 Qb8 19. Bc5 Rf7 20. Qb3 g6 21. Rcd1 Bc6) 15... e5 16. dxe5 Nxe5 17. Nxe5 Bxe5 18. Rc1 Qb6? { (-0.97 → 0.08) Mistake. Qd6 was best. } (18... Qd6 19. Nf5) 19. Bxf6?? { (0.08 → -1.57) Blunder. Be3 was best. } (19. Be3) 19... Rxf6? { (-1.57 → -0.23) Mistake. Qxf6 was best. } (19... Qxf6 20. Rf1 Kh8 21. Rc2 Bc6 22. b3 g6 23. Kh1 Bd6 24. Re2 Kg7 25. f4 Rxe2 26. Qxe2) 20. Qc2?? { (-0.23 → -5.70) Blunder. Rc2 was best. } (20. Rc2 Bxb2 21. Be4 dxe4 22. Qxd7 Rd8 23. Qc7 e3 24. Rxe3 Qxc7 25. Rxc7 Rd1+ 26. Nf1 Bd4) 20... Rxf2 { [%csl Gd4][%cal Ge5d4] } 21. Qc5?! { (-5.42 → -7.32) Inaccuracy. Qxf2 was best. } (21. Qxf2) 21... Qxc5 22. Rxc5 Rd2 23. Rxd5 Bd4+ 24. Rxd4 Rxe1+ 25. Nf1 Bb5 26. Bc4+ Bxc4 27. Rxc4 Rxb2 28. h3 h6 29. Rf4 { White resigns. } 29... Rxa2 30. Rb4 Raa1 31. Rf4 b5 { [%csl Gf2][%cal Gg1f2] } 32. g4 b4 33. Kg2 Rxf1 34. Rxf1 Rxf1 35. Kxf1 b3 36. Ke2 b2 37. Kd1 b1=Q+ 38. Kd2 a5 39. Ke3 a4 40. Kd4 a3 41. Kc3 a2 42. Kd4 a1=Q+ 43. Kd5 Qb3+ 44. Kd6 Qaa3+ 45. Kd7 Qb5+ 46. Kd8 Qaa5+ 47. Kc8 Qba6+ 48. Kb8 Qe5# 0-1
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/P6cWqi7s"]
+[Date "2021.02.14"]
+[White "mohan_dixit"]
+[Black "NaveedAhmed"]
+[Result "1-0"]
+[WhiteElo "2038"]
+[BlackElo "2060"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "B01"]
+[Opening "Scandinavian Defense: Modern Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - NaveedAhmed"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/tTCjqbTV"]
+
+1. e4 d5 2. exd5 Nf6 { B01 Scandinavian Defense: Modern Variation } 3. Nc3 Nxd5 4. Bc4 Be6 5. Nxd5 Bxd5 6. Bxd5 Qxd5 7. Nf3 Nc6 8. d4 e6 9. O-O Bd6 10. c3 O-O-O 11. b4 h6 12. a4 g5 13. b5 Ne7 14. Qd3 g4 15. c4 Qh5 16. c5 gxf3 17. cxd6 fxg2 18. Re1 Rxd6 19. Bf4 Rd7 20. a5 Rhd8 21. b6 a6 (21... Rxd4 22. Qxd4 Rxd4 23. bxa7 Rxf4 24. a8=Q+ { [%csl Gc8] } 24... Kd7 25. Rad1+ Nd5 26. Qxb7) 22. bxc7 Rg8 23. Rab1 Nf5 24. Qxa6 Rxc7 (24... bxa6 25. Rb8#) 25. Qa8+ Kd7 26. Qxg8 Nh4 27. Re3 Nf3+ 28. Rxf3 Qxf3 29. Qxf7+ Kd8 30. Bxc7+ Kc8 31. Qxf3 { Black resigns. } 31... Kxc7 32. Rxb7+ Kd6 33. a6 e5 34. a7 exd4 35. a8=Q d3 36. Qd8+ Kc5 37. Rc7+ Kb4 38. Qb7+ Ka3 39. Qda8# 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/lvvJ0RqU"]
+[Date "2021.03.27"]
+[White "mohan_dixit"]
+[Black "Tandileo25"]
+[Result "1-0"]
+[WhiteElo "2049"]
+[BlackElo "2070"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "B56"]
+[Opening "Sicilian Defense: Classical Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - Tandileo25"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/jS1gcaS7"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 { B56 Sicilian Defense: Classical Variation } 6. Be3 a6 7. Be2 e5 8. Nb3 Be6 9. Nd5 Bxd5 10. exd5 Na5 11. O-O Nxb3 12. axb3 Be7 13. Kh1 O-O 14. f4 Ne4? { (0.07 → 1.14) Mistake. exf4 was best. } (14... exf4 15. Bxf4 Nd7 16. b4 Qb6 17. Qd2 Rfe8 18. Be3 Qc7 19. c4 b6 20. Bd1 a5 21. Ba4) 15. Bd3?! { (1.14 → 0.26) Inaccuracy. fxe5 was best. } (15. fxe5 dxe5 16. Qd3 f5 17. Rxf5 Rxf5 18. Qxe4 Rf6 19. Bc4 Qd6 20. Bd3 g6 21. c4 Qb4) 15... exf4 16. Rxf4?! { (0.58 → -0.23) Inaccuracy. Bxf4 was best. } (16. Bxf4) 16... Nf6?! { (-0.23 → 0.53) Inaccuracy. Nc5 was best. } (16... Nc5) 17. Qf3 Rc8?? { (0.42 → 5.39) Blunder. Nd7 was best. } (17... Nd7 18. Bd4 Ne5 19. Qg3 g6 20. h4 Bf6 21. h5 Bg7 22. Bc3 Rc8 23. Bf5 Rc5 24. Rd1) 18. Qh3?? { (5.39 → 2.43) Blunder. Bd4 was best. } (18. Bd4) 18... g6 19. Raf1 Nh5? { (1.54 → 2.78) Mistake. Nxd5 was best. } (19... Nxd5 20. Rxf7 Rxf7 21. Rxf7 Kxf7 22. Qxh7+ Ke6 23. Qxg6+ Kd7 24. Qf5+ Kc7 25. Qxd5 Qe8 26. Bf5) 20. Rg4 Ng7 21. Qh6 Bf6 22. Rxf6?? { (2.89 → -0.40) Blunder. Rf3 was best. } (22. Rf3 Re8) 22... Qxf6 23. Rh4 Nh5?? { (-0.86 → 5.10) Blunder. Rfe8 was best. } (23... Rfe8 24. Qxh7+ Kf8 25. Rb4 Nf5 26. Bd2 Re5 27. g4 Qh4 28. Qxh4 Nxh4 29. Rb6 Rce8 30. h3) 24. Rxh5 Qg7 25. Qxg7+ Kxg7 26. Bh6+ Kg8 27. Bxf8 gxh5 28. Bxd6 Rd8 29. Bg3 h4 30. Bxh4 Rxd5 31. Kg1 b5 32. Kf2 f5 33. Ke3 Kf7 34. c4 Rc5 35. Kd4 Rc8 36. Bxf5 Rc7 37. Bxh7 bxc4 38. bxc4 Rb7 39. Kc3 a5 40. Be4 Ra7 41. Bf2 Re7 42. Bd5+ Kg6 43. Bb6 a4 44. Bf3 Re6 45. Bd4 Ra6 46. Kb4 Rd6 47. Bc3 { Black resigns. } 47... Ra6 48. Kb5 Ra8 49. Ba5 Rb8+ 50. Kxa4 Rxb2 51. c5 Rc2 52. c6 Kf6 53. c7 Ke7 54. Bg4 Rxg2 55. c8=Q Rxh2 56. Qd7+ Kf8 57. Bb4+ Kg8 58. Be6+ Kh8 59. Bc3# 1-0
+
+
+[Event "Rated Rapid game"]
+[Site "https://lichess.org/nAtA2Wrd"]
+[Date "2021.07.03"]
+[White "mohan_dixit"]
+[Black "Apathetic-Empathy"]
+[Result "1-0"]
+[WhiteElo "1933"]
+[BlackElo "2049"]
+[TimeControl "900+10"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[Variant "Standard"]
+[ECO "B22"]
+[Opening "Sicilian Defense: Alapin Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - Apathetic-Empathy"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/ZH03zS9n"]
+
+1. e4 c5 2. c3 { B22 Sicilian Defense: Alapin Variation } 2... d6 3. d4 cxd4 4. cxd4 Nf6 5. Nc3 a6 6. Nf3 e6 7. Bc4? { (1.35 → 0.15) Mistake. Bd3 was best. } (7. Bd3 Be7 8. Qe2 Nc6 9. h3 O-O 10. O-O e5 11. Be3 Nxd4) 7... b5?! { (0.15 → 0.67) Inaccuracy. Nxe4 was best. } (7... Nxe4 8. Nxe4 d5 9. Bd3 dxe4 10. Bxe4 Bb4+ 11. Bd2 Bxd2+ 12. Qxd2) 8. Bb3?! { (0.67 → 0.14) Inaccuracy. Bd3 was best. } (8. Bd3 Bb7 9. d5 exd5 10. Nxd5 Nxd5 11. exd5 Be7 12. O-O O-O) 8... Bb7?! { (0.14 → 1.16) Inaccuracy. b4 was best. } (8... b4 9. Na4) 9. d5 exd5?! { (1.03 → 1.84) Inaccuracy. e5 was best. } (9... e5) 10. Bxd5?! { (1.84 → 0.82) Inaccuracy. Nxd5 was best. } (10. Nxd5 Be7) 10... Bxd5 11. exd5 Nbd7 12. O-O Be7 13. Nd4 O-O?? { (1.26 → 3.70) Blunder. Ne5 was best. } (13... Ne5 14. Bg5) 14. Nc6 Qe8 15. Re1 Ne5 16. Nxe5?? { (3.71 → 1.37) Blunder. Bg5 was best. } (16. Bg5 Qd7 17. Nxe7+ Qxe7 18. Ne4 Rfe8 19. Bxf6 gxf6 20. f4 Ng6 21. Qd4 Kg7 22. Kf1 Qd8) 16... dxe5 17. Rxe5 Qd7 18. Bg5 h6 19. Bh4 g5 20. Bxg5 hxg5 21. Rxg5+ Kh8 22. Qd4 Rg8 23. Rh5+ Kg7 24. Ne4 Qd8 25. d6 Bxd6 26. Nxd6 Kg6 27. Rh6+?! { (13.62 → 6.37) Inaccuracy. Rh3 was best. } (27. Rh3 Qd7 28. Rg3+ Qg4 29. Rxg4+ Nxg4 30. Qxg4+ Kf6 31. Qf4+ Kg6 32. Qxf7+ Kh6 33. Nf5+ Kg5) 27... Kg7?? { (6.37 → Mate in 8) Checkmate is now unavoidable. Kxh6 was best. } (27... Kxh6 28. Nxf7+ Kg7 29. Nxd8 Raxd8 30. Qc3 Rc8 31. Qf3 Rc4 32. h3 Rgc8 33. Re1 Rc1 34. Rxc1 Rxc1+ 35. Kh2) 28. Nf5+ Kf8 29. Qc5+ Ke8 30. Re1+ Kd7 31. Re7+ { Black resigns. } 1-0
+
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2021.08.11"]
+[White "mccannj"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "1869"]
+[BlackElo "1769"]
+[TimeControl "1800"]
+[Termination "mohan_dixit won by resignation"]
+[Variant "Standard"]
+[ECO "A13"]
+[Opening "English Opening: Agincourt Defense, Catalan Defense, Semi-Slav Defense"]
+[StudyName "My Best Games"]
+[ChapterName "mccannj - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/n5u0nLxn"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. c4 e6 2. g3 d5 3. Bg2 c6 4. Nf3 Nf6 5. O-O Nbd7 6. d4 Bd6 7. Qd3 Ne4 8. Nc3 f5 9. e3 Ndf6 10. Nd2 h5 11. Ndxe4 fxe4 12. Qe2 h4 13. cxd5 exd5 14. Bd2 Ng4 15. h3 hxg3 16. hxg4 Qh4 17. fxg3 (17. Rfc1 Bxg4 18. Qe1 Qh2+ 19. Kf1 Qh1+!! 20. Bxh1 Rxh1+ 21. Kg2 Bf3#!) 17... Qh2+ { 0-1 Black wins. } 18. Kf2 Bxg3# 0-1
+
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2021.08.06"]
+[White "Vladimir-1935"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "1780"]
+[BlackElo "1753"]
+[TimeControl "1800"]
+[Termination "mohan_dixit won by checkmate"]
+[Variant "Standard"]
+[ECO "C02"]
+[Opening "French Defense: Advance Variation, Euwe Variation"]
+[StudyName "My Best Games"]
+[ChapterName "Vladimir-1935 - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/Vye856mM"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 e6 2. d4 d5 3. e5 c5 4. c3 Nc6 5. Nf3 Bd7 6. a3 cxd4 7. cxd4 Nge7 8. b4 Nf5 9. Bb2 Qb6 10. Be2 a5 11. b5 Nb8 12. a4 Na6 13. O-O Nb4 14. Nbd2 Be7 15. Nb3 O-O 16. Qd2 Rac8 17. Rac1 Na2 18. Rxc8 Rxc8 19. Bd3 Bb4 20. Qe2 Nc3 21. Bxc3 Rxc3 22. Bxf5 exf5 23. Qb2 Qg6 24. Kh1 f4 25. Rc1 Rxf3 26. gxf3 Qd3 (26... Bh3 27. Rg1 Qd3! 28. Nd2 Bxd2 29. Qa3 Qxa3 30. Rg3 fxg3 31. hxg3 Qxf3+ 32. Kg1 Qg2#) 27. Kg2 Bh3+ 28. Kxh3 Qxf3+ 29. Kh4 Be7# { 0-1 Black wins by checkmate. } 0-1
+
+
+[Event "Rated Rapid game"]
+[Site "https://lichess.org/nlPdDvD3"]
+[Date "2021.10.12"]
+[White "Naderrahmati"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2154"]
+[BlackElo "2144"]
+[TimeControl "600+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "A45"]
+[Opening "Indian Defense"]
+[StudyName "My Best Games"]
+[ChapterName "Naderrahmati - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/2EATffio"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. d4 { [%clk 0:10:00] } 1... Nf6 { [%clk 0:10:00] } 2. e3 { [%clk 0:09:57] } 2... g6 { [%clk 0:09:59] } 3. c4 { [%clk 0:09:57] } 3... Bg7 { [%clk 0:09:58] } 4. Nc3 { [%clk 0:09:56] } 4... O-O { [%clk 0:09:55] } 5. Nf3 { [%clk 0:09:54] } 5... d6 { [%clk 0:09:54] } 6. Bd3 { [%clk 0:09:52] } 6... c5 { [%clk 0:09:32] } 7. d5 { [%clk 0:09:45] } 7... a6 { [%clk 0:09:18] } 8. O-O { [%clk 0:09:43] } 8... Bg4 { [%clk 0:09:09] } 9. h3 { [%clk 0:09:41] } 9... Bxf3 { [%clk 0:09:01] } 10. Qxf3 { [%clk 0:09:39] } 10... Nbd7 { [%clk 0:08:56] } 11. e4 { [%clk 0:09:37] } 11... Ne5 { [%clk 0:08:39] } 12. Qe2 { [%clk 0:09:35] } 12... e6 { [%clk 0:08:36] } 13. f4 { [%clk 0:09:31] } 13... Nxd3 { [%clk 0:08:30] } 14. Qxd3 { [%clk 0:09:30] } 14... exd5 { [%clk 0:08:28] } 15. cxd5 { [%clk 0:09:27] } 15... Qb6 { [%clk 0:08:25] } 16. Be3 { [%clk 0:09:23] } 16... Rfe8 { [%clk 0:08:11] } 17. Rab1 { [%clk 0:08:57] } 17... Qc7 { [%clk 0:07:21] } 18. a3 { [%clk 0:08:19] } 18... b5 { [%clk 0:07:09] } 19. Rbe1? { [%clk 0:08:10] } 19... b4! { [%clk 0:06:49] } 20. axb4 { [%clk 0:08:08] } 20... cxb4 { [%clk 0:06:47] } 21. e5 { [%clk 0:08:07] } 21... bxc3 { [%clk 0:06:31] } 22. exf6 { [%clk 0:08:05] } 22... Bxf6 { [%clk 0:06:29] } 23. bxc3 { [%clk 0:08:02] } 23... Qxc3 { [%clk 0:06:13] } 24. Qxc3 { [%clk 0:07:57] } 24... Bxc3 { [%clk 0:06:13] } 25. Re2 { [%clk 0:07:49] } 25... Rxe3! { [%clk 0:05:54] } 26. Rxe3 { [%clk 0:07:45] } 26... Bd4 { [%clk 0:05:53] } 27. Re1 { [%clk 0:07:44] } 27... Re8 { [%clk 0:05:51] } 28. Kf2 { [%clk 0:07:42] } 28... Kg7 { [%clk 0:05:39] } 29. Kf3 { [%clk 0:07:41] } 29... Rxe3+ { [%clk 0:05:32] } 30. Rxe3 { [%clk 0:07:39] } 30... Bxe3 { [%clk 0:05:32] } 31. Kxe3 { [%clk 0:07:39] } 31... Kf6 { [%clk 0:05:31] } 32. g4 { [%clk 0:07:37] } 32... g5! { [%clk 0:05:29] } 33. fxg5+ { [%clk 0:07:24] } 33... Kxg5 { [%clk 0:05:25] } 34. Kd3 { [%clk 0:07:18] } 34... Kh4 { [%clk 0:05:24] } 35. Kc4 { [%clk 0:07:15] } 35... Kxh3 { [%clk 0:05:22] } 36. Kb4 { [%clk 0:07:15] } 36... Kxg4 { [%clk 0:05:21] } 37. Ka5 { [%clk 0:07:15] } 37... h5 { [%clk 0:05:17] } 38. Kxa6 { [%clk 0:07:15] } 38... h4 { [%clk 0:05:17] } 39. Kb6 { [%clk 0:07:15] } 39... h3 { [%clk 0:05:08] } 40. Kc6 { [%clk 0:07:15] } 40... h2 { [%clk 0:05:07] } 41. Kxd6 { [%clk 0:07:15] } 41... h1=Q { [%clk 0:05:06] } 42. Ke7 { [%clk 0:07:15] } 42... Qxd5 { 0-1 White resigns. } { [%clk 0:05:03] } 0-1
+
+
+[Event "Rated Rapid game"]
+[Site "https://lichess.org/JxGHkP4m"]
+[Date "2021.10.25"]
+[White "jrc1316"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2229"]
+[BlackElo "2165"]
+[TimeControl "900+10"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "E87"]
+[Opening "King's Indian Defense: Sämisch Variation, Closed Variation"]
+[StudyName "My Best Games"]
+[ChapterName "jrc1316 - mohan_dixit"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/An7FvEJJ"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. d4 { [%clk 0:15:00] } 1... Nf6 { [%clk 0:15:00] } 2. c4 { [%clk 0:15:08] } 2... g6 { [%clk 0:15:08] } 3. Nc3 { [%clk 0:15:17] } 3... Bg7 { [%clk 0:15:17] } 4. e4 { [%clk 0:15:26] } 4... d6 { [%clk 0:15:25] } 5. f3 { [%clk 0:15:34] } 5... O-O { [%clk 0:15:34] } 6. Be3 { [%clk 0:15:42] } 6... e5 { [%clk 0:15:36] } 7. d5 { [%clk 0:15:48] } 7... a5 { [%clk 0:15:42] } 8. Qd2 { [%clk 0:15:55] } 8... Na6 { [%clk 0:15:42] } 9. Nge2 { [%clk 0:16:03] } 9... Nd7 { [%clk 0:15:41] } 10. Ng3 { [%clk 0:15:38] } 10... f5 { [%clk 0:15:37] } 11. Bg5 { [%clk 0:15:29] } 11... Nf6 { [%clk 0:15:39] } 12. exf5 { [%clk 0:15:29] } 12... gxf5 { [%clk 0:15:46] } 13. Nh5 { [%clk 0:15:31] } 13... f4 { [%clk 0:15:48] } 14. Nxg7 { [%clk 0:15:27] } 14... Kxg7 { [%clk 0:15:54] } 15. Bd3 { [%clk 0:14:43] } 15... Nc5 { [%clk 0:14:54] } 16. Qc2 { [%clk 0:14:30] } 16... Nxd3+ { [%clk 0:14:54] } 17. Qxd3 { [%clk 0:14:39] } 17... Qe8 { [%clk 0:15:03] } 18. Nb5 { [%clk 0:13:33] } 18... Qe7 { [%clk 0:13:07] } 19. O-O { [%clk 0:12:14] } 19... Qf7 { [%clk 0:12:22] } 20. Rfe1 { [%clk 0:11:45] } 20... Ne8 { [%clk 0:12:00] } 21. Bh4 { [%clk 0:10:36] } 21... Bf5 { [%clk 0:11:45] } 22. Qc3 { [%clk 0:10:39] } 22... Qh5 { [%clk 0:11:00] } 23. Bf2 { [%clk 0:10:25] } 23... Rf6 { [%clk 0:10:25] } 24. Rac1 { [%clk 0:08:38] } 24... Rg6 { [%clk 0:09:40] } 25. Kh1 { [%clk 0:06:52] } 25... Qg5 { [%clk 0:06:05] } 26. Rg1 { [%clk 0:06:39] } 26... Rh6 { [%clk 0:06:03] } 27. g3 { [%clk 0:05:52] } 27... Rxh2+ { [%clk 0:05:59] } 28. Kxh2 { [%clk 0:05:37] } 28... Qh6+ { 0-1 White resigns. } { [%clk 0:06:06] } 0-1
+
+
+[Event "Rated Blitz tournament https://lichess.org/tournament/of6pvckr"]
+[Site "https://lichess.org/QjnM0kVV"]
+[Date "2021.11.20"]
+[White "mohan_dixit"]
+[Black "yangyang269"]
+[Result "1-0"]
+[WhiteElo "2053"]
+[BlackElo "2093"]
+[TimeControl "180+3"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "B08"]
+[Opening "Pirc Defense: Classical Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - yangyang269"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/yjLjXTLG"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:03:00] } 1... d6 { [%clk 0:03:00] } 2. d4 { [%clk 0:03:01] } 2... Nf6 { [%clk 0:03:02] } 3. Nc3 { [%clk 0:03:03] } 3... g6 { [%clk 0:03:03] } 4. Nf3 { [%clk 0:03:04] } 4... Bg7 { [%clk 0:03:05] } 5. Bg5 { [%clk 0:03:06] } 5... O-O { [%clk 0:03:07] } 6. Bd3 { [%clk 0:03:06] } 6... Nbd7 { [%clk 0:03:09] } 7. Qd2 { [%clk 0:03:08] } 7... b6 { [%clk 0:03:04] } 8. Bh6 { [%clk 0:03:06] } 8... Bb7 { [%clk 0:03:02] } 9. Bxg7 { [%clk 0:03:06] } 9... Kxg7 { [%clk 0:03:05] } 10. h4 { [%clk 0:02:57] } 10... h5 { [%clk 0:03:05] } 11. Ng5 { [%clk 0:02:40] } 11... e5 { [%clk 0:02:44] } 12. d5 { [%clk 0:02:35] } 12... Nc5 { [%clk 0:02:39] } 13. b4 { [%clk 0:02:31] } 13... Nxd3+ { [%clk 0:02:39] } 14. cxd3 { [%clk 0:02:30] } 14... a5 { [%clk 0:02:41] } 15. b5 { [%clk 0:02:29] } 15... Nd7 { [%clk 0:02:26] } 16. g4 { [%clk 0:02:09] } 16... Rh8 { [%clk 0:02:15] } 17. gxh5 { [%clk 0:01:50] } 17... Rxh5 { [%clk 0:02:15] } 18. f4 { [%clk 0:01:35] } 18... Qh8 { [%clk 0:01:52] } 19. Qf2 { [%clk 0:01:28] } 19... Nc5 { [%clk 0:01:46] } 20. Kd2 { [%clk 0:01:28] } 20... f6 { [%clk 0:01:15] } 21. fxe5 { [%clk 0:00:54] } 21... dxe5 { [%clk 0:00:48] } 22. Raf1 { [%clk 0:00:41] } 22... Rf8 { [%clk 0:00:47] } 23. Qg3 { [%clk 0:00:27] } 23... fxg5 { [%clk 0:00:45] } 24. Qxe5+ { [%clk 0:00:27] } 24... Kh7 { [%clk 0:00:45] } 25. Qe7+ { [%clk 0:00:21] } 25... Qg7 { [%clk 0:00:47] } 26. Qxf8 { [%clk 0:00:22] } 26... Qxf8 { [%clk 0:00:36] } 27. Rxf8 { [%clk 0:00:25] } 27... gxh4 { [%clk 0:00:37] } 28. Rf7+ { [%clk 0:00:26] } 28... Kh6 { [%clk 0:00:39] } 29. Rxc7 { [%clk 0:00:28] } 29... h3 { [%clk 0:00:38] } 30. d6 { [%clk 0:00:29] } 30... Ba8 { [%clk 0:00:30] } 31. d7 { [%clk 0:00:30] } 31... Nxd7 { [%clk 0:00:31] } 32. Rxd7 { [%clk 0:00:32] } 32... h2 { [%clk 0:00:30] } 33. Rd8 { [%clk 0:00:33] } 33... Bb7 { [%clk 0:00:29] } 34. Rh8+ { [%clk 0:00:35] } 34... Kg5 { [%clk 0:00:31] } 35. Rxh5+ { [%clk 0:00:37] } 35... Kxh5 { 1-0 Black resigns. } { [%clk 0:00:34] } 1-0
+
+
+[Event "Rated Blitz tournament https://lichess.org/tournament/of6pvckr"]
+[Site "https://lichess.org/j4kgh6OP"]
+[Date "2021.11.20"]
+[White "mohan_dixit"]
+[Black "yangyang269"]
+[Result "1-0"]
+[WhiteElo "2053"]
+[BlackElo "2082"]
+[TimeControl "180+3"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "B07"]
+[Opening "Pirc Defense"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit - yangyang269"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/9ZNlqDIz"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:03:00] } 1... d6 { [%clk 0:03:00] } 2. d4 { [%clk 0:03:02] } 2... Nf6 { [%clk 0:03:02] } 3. Nc3 { [%clk 0:03:03] } 3... g6 { [%clk 0:03:05] } 4. Bd3 { [%clk 0:03:04] } 4... Bg7 { [%clk 0:03:07] } 5. Bg5 { [%clk 0:03:06] } 5... O-O { [%clk 0:03:10] } 6. Nf3 { [%clk 0:03:07] } 6... h6 { [%clk 0:03:09] } 7. Bxf6 { [%clk 0:03:08] } 7... exf6 { [%clk 0:03:10] } 8. Qd2 { [%clk 0:03:10] } 8... Kh7 { [%clk 0:03:12] } 9. h4 { [%clk 0:03:09] } 9... Nc6 { [%clk 0:03:13] } 10. h5 { [%clk 0:03:10] } 10... Qe7 { [%clk 0:03:11] } 11. hxg6+ { [%clk 0:03:09] } 11... fxg6 { [%clk 0:03:14] } 12. O-O-O { [%clk 0:02:43] } 12... f5 { [%clk 0:03:13] } 13. exf5 { [%clk 0:02:34] } 13... Bxf5 { [%clk 0:03:16] } 14. Bxf5 { [%clk 0:02:34] } 14... Rxf5 { [%clk 0:03:18] } 15. Nh4 { [%clk 0:02:23] } 15... Rf7 { [%clk 0:03:06] } 16. Nxg6 { [%clk 0:01:20] } 16... Qf6 { [%clk 0:02:26] } 17. Nh4 { [%clk 0:00:53] } 17... Qxf2 { [%clk 0:02:17] } 18. Qd3+ { [%clk 0:00:54] } 18... Kg8 { [%clk 0:02:05] } 19. Rdf1 { [%clk 0:00:54] } 19... Qg3 { [%clk 0:01:46] } 20. Qxg3 { 1-0 Black resigns. } { [%clk 0:00:52] } 1-0
+
+
+[Event "Rated Rapid game"]
+[Site "https://lichess.org/homPRXdj"]
+[Date "2022.05.23"]
+[White "mohan_dixit"]
+[Black "Lexenuesta"]
+[Result "1-0"]
+[WhiteElo "2098"]
+[BlackElo "2040"]
+[TimeControl "600+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "B22"]
+[Opening "Sicilian Defense: Alapin Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit (2098) - Lexenuesta (2040)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/xS4e171G"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:10:00] } 1... c5 { [%clk 0:10:00] } 2. c3 { [%clk 0:09:58] } 2... Nc6 { [%clk 0:09:59] } 3. d4 { [%clk 0:09:57] } 3... cxd4 { [%clk 0:09:57] } 4. cxd4 { [%clk 0:09:57] } 4... d6 { [%clk 0:09:56] } 5. Nc3 { [%clk 0:09:55] } 5... Nf6 { [%clk 0:09:52] } 6. Nf3 { [%clk 0:09:52] } 6... e6 { [%clk 0:09:48] } 7. Bb5 { [%clk 0:09:49] } 7... Bd7 { [%clk 0:09:43] } 8. Bg5 { [%clk 0:09:47] } 8... Be7 { [%clk 0:09:41] } 9. O-O { [%clk 0:09:28] } 9... O-O { [%clk 0:09:36] } 10. Rc1 { [%clk 0:09:05] } 10... a6 { [%clk 0:09:26] } 11. Bxc6 { [%clk 0:08:55] } 11... bxc6 { [%clk 0:09:23] } 12. e5 { [%clk 0:08:29] } 12... dxe5 { [%clk 0:09:11] } 13. dxe5 { [%clk 0:08:27] } 13... Nd5 { [%clk 0:09:08] } 14. Bxe7 { [%clk 0:07:38] } 14... Qxe7 { [%clk 0:09:05] } 15. Ne4 { [%clk 0:07:33] } 15... Rab8 { [%clk 0:08:36] } 16. Nfg5 { [%clk 0:06:58] } 16... Rxb2 { [%clk 0:08:28] } 17. Nxh7 { [%clk 0:06:54] } 17... Kxh7 { [%clk 0:07:45] } (17... Rd8 { A really interesting line that could have occured } 18. Qh5 Rxa2 19. Nhf6+ gxf6 20. Nxf6+ Nxf6 21. Qg5+ Kf8 22. exf6) 18. Qh5+ { [%clk 0:06:50] } 18... Kg8 { [%clk 0:07:29] } 19. Ng5 { [%clk 0:06:49] } 19... Nf6 { [%clk 0:07:27] } 20. exf6 { [%clk 0:06:43] } 20... Qxf6 { [%clk 0:07:23] } 21. Qh7# { 1-0 White wins by checkmate. } { [%clk 0:06:42] } 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/QR6Z3BhU"]
+[Date "2022.08.03"]
+[White "mohan_dixit"]
+[Black "kinghead"]
+[Result "1-0"]
+[WhiteElo "2019"]
+[BlackElo "2109"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "C11"]
+[Opening "French Defense: Steinitz Variation, Boleslavsky Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit (2019) - kinghead (2109)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/IDM4Nwod"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:30:00] } 1... e6 { [%clk 0:30:00] } 2. d4 { [%clk 0:29:57] } 2... d5 { [%clk 0:29:23] } 3. Nc3 { [%clk 0:29:48] } 3... Nf6 { [%clk 0:29:21] } 4. e5 { [%clk 0:29:39] } 4... Nfd7 { [%clk 0:29:19] } 5. f4 { [%clk 0:29:36] } 5... c5 { [%clk 0:28:59] } 6. Nf3 { [%clk 0:29:25] } 6... Nc6 { [%clk 0:27:53] } 7. Be3 { [%clk 0:29:13] } 7... cxd4 { [%clk 0:27:47] } 8. Nxd4 { [%clk 0:29:02] } 8... Nxd4 { [%clk 0:27:45] } 9. Bxd4 { [%clk 0:28:58] } 9... Bc5 { [%clk 0:27:43] } 10. Bb5 { [%clk 0:27:24] } 10... O-O { [%clk 0:27:32] } 11. Bxd7 { [%clk 0:26:58] } 11... Bxd4 { [%clk 0:27:30] } 12. Qxd4 { [%clk 0:26:45] } 12... Bxd7 { [%clk 0:27:27] } 13. O-O { [%clk 0:26:35] } 13... a6 { [%clk 0:27:23] } 14. Rf3 { [%clk 0:21:48] } 14... f5 { [%clk 0:27:11] } 15. Rd1 { [%clk 0:20:06] } 15... Kh8 { [%clk 0:26:55] } 16. Rh3 { [%clk 0:19:16] } 16... Rc8 { [%clk 0:26:48] } 17. Rdd3 { [%clk 0:18:58] } 17... Rc4 { [%clk 0:26:41] } 18. Qf2 { [%clk 0:18:49] } 18... b5 { [%clk 0:26:34] } 19. Qe2 { [%clk 0:16:47] } 19... Rxf4 { [%clk 0:26:12] } 20. Qh5 { [%clk 0:15:24] } 20... h6 { [%clk 0:25:47] } 21. Qg6 { [%clk 0:15:15] } 21... Kg8 { [%clk 0:24:04] } 22. Rhg3 { [%clk 0:12:58] } 22... Qb6+ { [%clk 0:22:56] } 23. Rde3 { [%clk 0:12:50] } 23... Rg4 { [%clk 0:22:53] } 24. Nxd5 { [%clk 0:12:02] } 24... Qd4 { [%clk 0:21:44] } 25. Rxg4 { [%clk 0:10:28] } 25... Qd1+ { [%clk 0:20:17] } 26. Kf2 { [%clk 0:10:24] } 26... fxg4+ { [%clk 0:20:16] } 27. Nf6+ { [%clk 0:09:55] } 27... Rxf6+ { [%clk 0:19:51] } 28. exf6 { [%clk 0:09:53] } 28... Qd2+ { [%clk 0:19:08] } 29. Kf1 { [%clk 0:09:21] } 29... Qc1+ { [%clk 0:17:29] } 30. Ke2 { [%clk 0:09:17] } 30... Qxc2+ { [%clk 0:17:18] } 31. Qxc2 { 1-0 Black resigns. } { [%clk 0:09:14] } 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/4nVapDmQ"]
+[Date "2022.08.16"]
+[White "mohan_dixit"]
+[Black "Brainded"]
+[Result "1-0"]
+[WhiteElo "2041"]
+[BlackElo "2053"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "B22"]
+[Opening "Sicilian Defense: Alapin Variation, Smith-Morra Declined"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit (2041) - Brainded (2053)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/TI4uFfSw"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:30:00] } 1... c5 { [%clk 0:30:00] } 2. c3 { [%clk 0:29:58] } 2... Nf6 { [%clk 0:29:57] } 3. e5 { [%clk 0:29:56] } 3... Nd5 { [%clk 0:29:55] } 4. d4 { [%clk 0:29:55] } 4... cxd4 { [%clk 0:29:37] } 5. cxd4 { [%clk 0:29:55] } 5... d6 { [%clk 0:29:36] } 6. exd6 { [%clk 0:29:53] } 6... Qxd6 { [%clk 0:29:25] } 7. Nc3 { [%clk 0:29:50] } 7... Nc6 { [%clk 0:29:23] } 8. Nf3 { [%clk 0:29:37] } 8... g6 { [%clk 0:29:15] } 9. Bb5 { [%clk 0:29:24] } 9... Bg7 { [%clk 0:29:14] } 10. O-O { [%clk 0:29:20] } 10... O-O { [%clk 0:29:11] } 11. Re1 { [%clk 0:29:14] } 11... Bg4 { [%clk 0:28:56] } 12. Nxd5 { [%clk 0:28:46] } 12... Qxd5 { [%clk 0:28:52] } 13. Bxc6 { [%clk 0:28:41] } 13... bxc6 { [%clk 0:28:46] } 14. Be3 { [%clk 0:28:23] } 14... Rab8 { [%clk 0:28:24] } 15. b3 { [%clk 0:28:07] } 15... c5 { [%clk 0:27:50] } 16. dxc5 { [%clk 0:27:32] } 16... Qh5 { [%clk 0:27:45] } 17. Rc1 { [%clk 0:27:13] } 17... Rbd8 { [%clk 0:27:10] } 18. Qe2 { [%clk 0:26:54] } 18... e5 { [%clk 0:26:59] } 19. h3 { [%clk 0:26:44] } 19... Bc8 { [%clk 0:26:04] } 20. Bg5 { [%clk 0:24:20] } 20... Rde8 { [%clk 0:25:21] } 21. Be3 { [%clk 0:22:51] } 21... f5 { [%clk 0:25:18] } 22. c6 { [%clk 0:22:47] } 22... f4 { [%clk 0:25:12] } 23. Bc5 { [%clk 0:20:31] } 23... Rf7 { [%clk 0:25:11] } 24. Rcd1 { [%clk 0:19:45] } 24... e4 { [%clk 0:25:00] } 25. Qc4 { [%clk 0:18:02] } 25... Be6 { [%clk 0:24:53] } 26. Rxe4 { [%clk 0:14:49] } 26... Bxc4 { [%clk 0:24:37] } 27. Rxe8+ { [%clk 0:14:45] } 27... Bf8 { [%clk 0:24:32] } 28. Bxf8 { [%clk 0:13:45] } 28... Rxf8 { [%clk 0:23:52] } 29. Rdd8 { [%clk 0:12:49] } 29... Rxe8 { [%clk 0:23:32] } 30. Rxe8+ { [%clk 0:12:46] } 30... Kf7 { [%clk 0:23:32] } 31. c7 { [%clk 0:12:41] } 31... Ba6 { [%clk 0:23:31] } 32. c8=Q { [%clk 0:11:41] } 32... Bxc8 { [%clk 0:23:29] } 33. Rxc8 { [%clk 0:11:41] } 33... Qa5 { [%clk 0:23:19] } 34. Rc2 { [%clk 0:11:14] } 34... g5 { [%clk 0:23:07] } 35. b4 { [%clk 0:10:34] } 35... Qxb4 { [%clk 0:22:53] } 36. Rc7+ { [%clk 0:10:32] } 36... Kf6 { [%clk 0:22:43] } 37. Rxa7 { [%clk 0:10:24] } 37... h6 { [%clk 0:22:11] } 38. Ra6+ { [%clk 0:10:05] } 38... Kg7 { [%clk 0:22:09] } 39. Ra7+ { [%clk 0:10:01] } 39... Kg6 { [%clk 0:21:46] } 40. Ra6+ { [%clk 0:09:56] } 40... Kh5 { [%clk 0:21:45] } 41. Kh2 { [%clk 0:07:57] } 41... Qc4 { [%clk 0:21:34] } 42. Ra5 { [%clk 0:07:21] } 42... Qc7 { [%clk 0:20:31] } 43. Ra6 { [%clk 0:07:04] } 43... Qc2 { [%clk 0:20:28] } 44. Ne5 { [%clk 0:06:09] } 44... Qe2 { [%clk 0:20:02] } 45. Re6 { [%clk 0:04:40] } 45... Qxa2 { [%clk 0:20:00] } 46. Rd6!! { [%clk 0:03:12] } 46... Qxf2 { [%clk 0:17:51] } (46... Qg8 47. Ng4 Qh8 48. Re6 Qg7 49. Nf6+ Kg6 50. Ne8+) 47. Rxh6+ { 1-0 Black resigns. } { [%clk 0:03:07] } 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/M0EPtL9Y"]
+[Date "2022.08.19"]
+[White "mohan_dixit"]
+[Black "ivanvak"]
+[Result "1-0"]
+[WhiteElo "2079"]
+[BlackElo "2098"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "C02"]
+[Opening "French Defense: Advance Variation, Milner-Barry Gambit"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit (2079) - ivanvak (2098)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/ADWxK4qd"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:30:00] } 1... e6 { [%clk 0:30:00] } 2. d4 { [%clk 0:29:59] } 2... d5 { [%clk 0:29:57] } 3. e5 { [%clk 0:29:55] } 3... c5 { [%clk 0:29:55] } 4. c3 { [%clk 0:29:54] } 4... Nc6 { [%clk 0:29:55] } 5. Nf3 { [%clk 0:29:53] } 5... Qb6 { [%clk 0:29:54] } 6. Bd3 { [%clk 0:29:48] } 6... cxd4 { [%clk 0:29:53] } 7. cxd4 { [%clk 0:29:47] } 7... Bd7 { [%clk 0:29:51] } 8. Nc3 { [%clk 0:29:44] } 8... Nb4 { [%clk 0:29:42] } 9. O-O { [%clk 0:29:19] } 9... Nxd3 { [%clk 0:29:38] } 10. Qxd3 { [%clk 0:29:19] } 10... Ne7 { [%clk 0:29:31] } 11. Bg5 { [%clk 0:29:08] } 11... Nc6 { [%clk 0:29:26] } 12. a3 { [%clk 0:28:57] } 12... Na5 { [%clk 0:29:12] } 13. Nd2 { [%clk 0:28:44] } 13... Rc8 { [%clk 0:29:04] } 14. b4 { [%clk 0:28:39] } 14... Nc4 { [%clk 0:29:03] } 15. Nxc4 { [%clk 0:28:38] } 15... Rxc4 { [%clk 0:29:02] } 16. Rac1 { [%clk 0:28:25] } 16... Qxd4 { [%clk 0:28:50] } 17. Qxd4 { [%clk 0:26:36] } 17... Rxd4 { [%clk 0:28:50] } 18. Nb5 { [%clk 0:24:27] } 18... Rc4 { [%clk 0:28:10] } 19. Rxc4 { [%clk 0:24:23] } 19... dxc4 { [%clk 0:28:08] } 20. Nc7# { 1-0 White wins by checkmate. } { [%clk 0:24:22] } 1-0
+
+
+[Event "Rated Classical game"]
+[Site "https://lichess.org/7vVlyUox"]
+[Date "2022.08.19"]
+[White "mohan_dixit"]
+[Black "SergeySaburin"]
+[Result "1/2-1/2"]
+[WhiteElo "2074"]
+[BlackElo "2173"]
+[TimeControl "1800+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "B22"]
+[Opening "Sicilian Defense: Alapin Variation"]
+[StudyName "My Best Games"]
+[ChapterName "mohan_dixit (2074) - SergeySaburin (2173)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/EpavzYbb"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:30:00] } 1... c5 { [%clk 0:30:00] } 2. c3 { [%clk 0:29:58] } 2... a6 { [%clk 0:29:55] } 3. d4 { [%clk 0:29:56] } 3... cxd4 { [%clk 0:29:54] } 4. cxd4 { [%clk 0:29:56] } 4... d5 { [%clk 0:29:53] } 5. exd5 { [%clk 0:29:54] } 5... Nf6 { [%clk 0:29:51] } 6. Nc3 { [%clk 0:29:52] } 6... Nxd5 { [%clk 0:29:49] } 7. Bc4 { [%clk 0:29:49] } 7... e6 { [%clk 0:29:48] } 8. Nf3 { [%clk 0:29:46] } 8... Be7 { [%clk 0:29:47] } 9. O-O { [%clk 0:29:43] } 9... O-O { [%clk 0:29:45] } 10. Bxd5 { [%clk 0:29:29] } 10... exd5 { [%clk 0:29:41] } 11. Bf4 { [%clk 0:29:25] } 11... Nc6 { [%clk 0:29:32] } 12. h3 { [%clk 0:29:19] } 12... Bf6 { [%clk 0:29:27] } 13. Qb3 { [%clk 0:28:21] } 13... Nxd4 { [%clk 0:28:55] } 14. Nxd4 { [%clk 0:28:09] } 14... Bxd4 { [%clk 0:28:53] } 15. Qxd5 { [%clk 0:27:27] } 15... Bxc3 { [%clk 0:28:22] } 16. Qxd8 { [%clk 0:27:25] } 16... Rxd8 { [%clk 0:28:20] } 17. bxc3 { [%clk 0:27:24] } 17... Be6 { [%clk 0:28:19] } 18. a3 { [%clk 0:27:17] } 18... b5 { [%clk 0:28:17] } 19. Rad1 { [%clk 0:27:08] } 19... Bb3 { [%clk 0:27:53] } 20. Rd6 { [%clk 0:26:22] } 20... Rxd6 { [%clk 0:27:39] } 21. Bxd6 { [%clk 0:26:22] } 21... Rd8 { [%clk 0:27:01] } 22. Re1 { [%clk 0:26:19] } 22... f5 { [%clk 0:26:49] } 23. Bb4 { [%clk 0:26:10] } 23... Rd1 { [%clk 0:26:47] } 24. Rxd1 { [%clk 0:25:59] } 24... Bxd1 { [%clk 0:26:45] } 25. Kf1 { [%clk 0:25:54] } 25... Kf7 { [%clk 0:26:43] } 26. Ke1 { [%clk 0:25:52] } 26... Bb3 { [%clk 0:26:40] } 27. Kd2 { [%clk 0:25:50] } 27... Ke6 { [%clk 0:26:36] } 28. Ke3 { [%clk 0:25:46] } 28... g5 { [%clk 0:26:24] } 29. g3 { [%clk 0:25:43] } 29... Ke5 { [%clk 0:25:20] } 30. f4+ { [%clk 0:25:15] } 30... gxf4+ { [%clk 0:25:18] } 31. gxf4+ { [%clk 0:25:15] } 31... Kd5 { [%clk 0:24:59] } 32. h4 { [%clk 0:25:11] } 32... h5 { 1/2-1/2 The game is a draw. } { [%clk 0:24:25] } 1/2-1/2
+
+
+[Event "Rated Blitz game"]
+[Site "https://lichess.org/TbG91oU1"]
+[Date "2023.01.08"]
+[White "lightcow"]
+[Black "mohan_dixit"]
+[Result "0-1"]
+[WhiteElo "2102"]
+[BlackElo "2086"]
+[TimeControl "180+0"]
+[Termination "Normal"]
+[Variant "Standard"]
+[ECO "C10"]
+[Opening "French Defense: Rubinstein Variation"]
+[StudyName "My Best Games"]
+[ChapterName "lightcow (2102) - mohan_dixit (2086)"]
+[ChapterURL "https://lichess.org/study/87BSSiOv/aD9WJYUs"]
+[Annotator "https://lichess.org/@/mohan_dixit"]
+
+1. e4 { [%clk 0:03:00] } 1... e6 { [%clk 0:03:00] } 2. d4 { [%clk 0:02:59] } 2... d5 { [%clk 0:03:00] } 3. Nc3 { [%clk 0:02:58] } 3... dxe4 { [%clk 0:02:59] } 4. Nxe4 { [%clk 0:02:57] } 4... Nf6 { [%clk 0:02:59] } 5. Nxf6+ { [%clk 0:02:55] } 5... Qxf6 { [%clk 0:02:59] } 6. Nf3 { [%clk 0:02:54] } 6... Bd6 { [%clk 0:02:58] } 7. Bd3 { [%clk 0:02:53] } 7... b6 { [%clk 0:02:57] } 8. O-O { [%clk 0:02:51] } 8... Bb7 { [%clk 0:02:57] } 9. Be2 { [%clk 0:02:46] } 9... Nc6 { [%clk 0:02:55] } 10. c3 { [%clk 0:02:45] } 10... O-O { [%clk 0:02:54] } 11. Bg5 { [%clk 0:02:44] } 11... Qg6 { [%clk 0:02:43] } 12. Bd3 { [%clk 0:02:43] } 12... Qh5 { [%clk 0:02:42] } 13. h3 { [%clk 0:02:39] } 13... h6 { [%clk 0:02:31] } 14. g4 { [%clk 0:02:37] } 14... Qxh3 { [%clk 0:02:29] } 15. Be3 { [%clk 0:02:26] } 15... Nxd4 { 0-1 White resigns. } { [%clk 0:02:25] } 0-1
+
+
