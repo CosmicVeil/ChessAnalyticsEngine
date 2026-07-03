@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import os
 from random import choice
 from confluent_kafka import Producer
 import chess.pgn
@@ -16,7 +16,7 @@ if __name__ == '__main__':
         'acks': 'all'
     }
 
-    pgn = open("../data/sample.pgn")
+    pgn = open(os.path.dirname(os.getcwd()) + "/data/sample.pgn")
 
 
 
