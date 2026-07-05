@@ -63,7 +63,7 @@ if __name__ == '__main__':
                 "time": game_node.clock()
             }
             producer.produce(topic="chess-moves", value=json.dumps(payload, indent = 4))
-            time.sleep(0.01)
+            time.sleep(0.07)
 
             board.push(move)
 
