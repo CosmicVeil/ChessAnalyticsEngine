@@ -305,27 +305,6 @@ Inaccuracy. Be6 was best. } (20... Be6 21. Nd4 Qd7 22. Nxe6 Nxe6 23. Rd1 Qe8 24.
 1. e4 { [%clk 0:03:00] } 1... d6 { [%clk 0:03:00] } 2. d4 { [%clk 0:03:01] } 2... Nf6 { [%clk 0:03:02] } 3. Nc3 { [%clk 0:03:03] } 3... g6 { [%clk 0:03:03] } 4. Nf3 { [%clk 0:03:04] } 4... Bg7 { [%clk 0:03:05] } 5. Bg5 { [%clk 0:03:06] } 5... O-O { [%clk 0:03:07] } 6. Bd3 { [%clk 0:03:06] } 6... Nbd7 { [%clk 0:03:09] } 7. Qd2 { [%clk 0:03:08] } 7... b6 { [%clk 0:03:04] } 8. Bh6 { [%clk 0:03:06] } 8... Bb7 { [%clk 0:03:02] } 9. Bxg7 { [%clk 0:03:06] } 9... Kxg7 { [%clk 0:03:05] } 10. h4 { [%clk 0:02:57] } 10... h5 { [%clk 0:03:05] } 11. Ng5 { [%clk 0:02:40] } 11... e5 { [%clk 0:02:44] } 12. d5 { [%clk 0:02:35] } 12... Nc5 { [%clk 0:02:39] } 13. b4 { [%clk 0:02:31] } 13... Nxd3+ { [%clk 0:02:39] } 14. cxd3 { [%clk 0:02:30] } 14... a5 { [%clk 0:02:41] } 15. b5 { [%clk 0:02:29] } 15... Nd7 { [%clk 0:02:26] } 16. g4 { [%clk 0:02:09] } 16... Rh8 { [%clk 0:02:15] } 17. gxh5 { [%clk 0:01:50] } 17... Rxh5 { [%clk 0:02:15] } 18. f4 { [%clk 0:01:35] } 18... Qh8 { [%clk 0:01:52] } 19. Qf2 { [%clk 0:01:28] } 19... Nc5 { [%clk 0:01:46] } 20. Kd2 { [%clk 0:01:28] } 20... f6 { [%clk 0:01:15] } 21. fxe5 { [%clk 0:00:54] } 21... dxe5 { [%clk 0:00:48] } 22. Raf1 { [%clk 0:00:41] } 22... Rf8 { [%clk 0:00:47] } 23. Qg3 { [%clk 0:00:27] } 23... fxg5 { [%clk 0:00:45] } 24. Qxe5+ { [%clk 0:00:27] } 24... Kh7 { [%clk 0:00:45] } 25. Qe7+ { [%clk 0:00:21] } 25... Qg7 { [%clk 0:00:47] } 26. Qxf8 { [%clk 0:00:22] } 26... Qxf8 { [%clk 0:00:36] } 27. Rxf8 { [%clk 0:00:25] } 27... gxh4 { [%clk 0:00:37] } 28. Rf7+ { [%clk 0:00:26] } 28... Kh6 { [%clk 0:00:39] } 29. Rxc7 { [%clk 0:00:28] } 29... h3 { [%clk 0:00:38] } 30. d6 { [%clk 0:00:29] } 30... Ba8 { [%clk 0:00:30] } 31. d7 { [%clk 0:00:30] } 31... Nxd7 { [%clk 0:00:31] } 32. Rxd7 { [%clk 0:00:32] } 32... h2 { [%clk 0:00:30] } 33. Rd8 { [%clk 0:00:33] } 33... Bb7 { [%clk 0:00:29] } 34. Rh8+ { [%clk 0:00:35] } 34... Kg5 { [%clk 0:00:31] } 35. Rxh5+ { [%clk 0:00:37] } 35... Kxh5 { 1-0 Black resigns. } { [%clk 0:00:34] } 1-0
 
 
-[Event "Rated Blitz tournament https://lichess.org/tournament/of6pvckr"]
-[Site "https://lichess.org/j4kgh6OP"]
-[Date "2021.11.20"]
-[White "mohan_dixit"]
-[Black "yangyang269"]
-[Result "1-0"]
-[WhiteElo "2053"]
-[BlackElo "2082"]
-[TimeControl "180+3"]
-[Termination "Normal"]
-[Variant "Standard"]
-[ECO "B07"]
-[Opening "Pirc Defense"]
-[StudyName "My Best Games"]
-[ChapterName "mohan_dixit - yangyang269"]
-[ChapterURL "https://lichess.org/study/87BSSiOv/9ZNlqDIz"]
-[Annotator "https://lichess.org/@/mohan_dixit"]
-
-1. e4 { [%clk 0:03:00] } 1... d6 { [%clk 0:03:00] } 2. d4 { [%clk 0:03:02] } 2... Nf6 { [%clk 0:03:02] } 3. Nc3 { [%clk 0:03:03] } 3... g6 { [%clk 0:03:05] } 4. Bd3 { [%clk 0:03:04] } 4... Bg7 { [%clk 0:03:07] } 5. Bg5 { [%clk 0:03:06] } 5... O-O { [%clk 0:03:10] } 6. Nf3 { [%clk 0:03:07] } 6... h6 { [%clk 0:03:09] } 7. Bxf6 { [%clk 0:03:08] } 7... exf6 { [%clk 0:03:10] } 8. Qd2 { [%clk 0:03:10] } 8... Kh7 { [%clk 0:03:12] } 9. h4 { [%clk 0:03:09] } 9... Nc6 { [%clk 0:03:13] } 10. h5 { [%clk 0:03:10] } 10... Qe7 { [%clk 0:03:11] } 11. hxg6+ { [%clk 0:03:09] } 11... fxg6 { [%clk 0:03:14] } 12. O-O-O { [%clk 0:02:43] } 12... f5 { [%clk 0:03:13] } 13. exf5 { [%clk 0:02:34] } 13... Bxf5 { [%clk 0:03:16] } 14. Bxf5 { [%clk 0:02:34] } 14... Rxf5 { [%clk 0:03:18] } 15. Nh4 { [%clk 0:02:23] } 15... Rf7 { [%clk 0:03:06] } 16. Nxg6 { [%clk 0:01:20] } 16... Qf6 { [%clk 0:02:26] } 17. Nh4 { [%clk 0:00:53] } 17... Qxf2 { [%clk 0:02:17] } 18. Qd3+ { [%clk 0:00:54] } 18... Kg8 { [%clk 0:02:05] } 19. Rdf1 { [%clk 0:00:54] } 19... Qg3 { [%clk 0:01:46] } 20. Qxg3 { 1-0 Black resigns. } { [%clk 0:00:52] } 1-0
-
-
 [Event "Rated Rapid game"]
 [Site "https://lichess.org/homPRXdj"]
 [Date "2022.05.23"]
