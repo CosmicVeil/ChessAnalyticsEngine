@@ -3,4 +3,10 @@ name = "chessanalyticsengine"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pandas>=3.0.3",
+    "pandas-stubs~=3.0.3",
+    "scikit-learn>=1.9.0",
+    "torch>=2.13.0",
+    "xgboost>=3.3.0",
+]

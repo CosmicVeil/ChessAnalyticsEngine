@@ -3,7 +3,8 @@ import os
 import sys
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from pathlib import Path
-import csv
+
+from csv_dataset import append_labeled_record
 
 folder_path = Path(os.path.dirname(os.getcwd()) + '/ml-model/')
 file_path = "chess_dataset.csv"
@@ -50,24 +51,8 @@ def main():
                 key = msg.key().decode('utf-8') if msg.key() else None
                 value = msg.value().decode('utf-8') if msg.value() else None
 
-                if  not full_path.is_file():
-                    with open(full_path, "w", newline="") as file:
-                        writer = csv.writer(file)
-                        writer.writerow(["GameID", "Features", "Cheating"])
-
-                with open(full_path, mode="a", newline="", encoding="utf-8") as file:
-
-                    data_dict = json.loads(msg.value())
-                    data_dict["GameID"] = key
-
-                    if "cheating" in key.lower():
-                        data_dict["Cheating"] = 1
-                    else:
-                        data_dict["Cheating"] = 0
-
-
-                    writer = csv.writer(file)
-                    writer.writerows(data_dict)
+                data_dict = json.loads(msg.value())
+                append_labeled_record(full_path, data_dict, key)
 
     except KeyboardInterrupt:
         print("\nAborted by user.")
@@ -79,6 +64,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
