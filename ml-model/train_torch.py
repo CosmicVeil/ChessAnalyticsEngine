@@ -65,22 +65,6 @@ def main() -> None:
     torch.save({"state_dict": model_cpu.state_dict(), "input_size": X_train.shape[1]}, pytorch_path)
     print(f"Saved PyTorch model to {pytorch_path}")
 
-    onnx_path = model_artifact_path("pytorch_model.onnx")
-    try:
-        # Export a portable ONNX copy using one real-shaped example tensor.
-        torch.onnx.export(
-            model_cpu,
-            torch.zeros(1, X_train.shape[1]),
-            onnx_path,
-            export_params=True,
-            opset_version=17,
-            input_names=["input"],
-            output_names=["output"],
-        )
-        print(f"Saved PyTorch ONNX model to {onnx_path}")
-    except (ImportError, ModuleNotFoundError, RuntimeError) as error:
-        print(f"Skipped ONNX export: {error}")
-
 
 if __name__ == "__main__":
     main()
