@@ -1,0 +1,75 @@
+"""Print and publish one joined result for each completed chess game."""
+
+import json
+from pathlib import Path
+import sys
+
+from confluent_kafka import Consumer, KafkaError, KafkaException, Producer
+
+
+PIPELINE_DIRECTORY = Path(__file__).resolve().parent
+if str(PIPELINE_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIRECTORY))
+
+from prediction_reporting import PredictionReporter
+
+
+BOOTSTRAP_SERVERS = "localhost:19092"
+
+
+def print_result(result: dict) -> None:
+    print(
+        f"Game: {result['game_id']} | "
+        f"PyTorch: {result['pytorch_score']:.2%} | "
+        f"XGBoost: {result['xgboost_score']:.2%}"
+    )
+    if result["pytorch_accuracy"] is None:
+        print("Running accuracy: unavailable until a verified game label is available.")
+    else:
+        print(
+            f"Running accuracy - PyTorch: {result['pytorch_accuracy']:.2%} | "
+            f"XGBoost: {result['xgboost_accuracy']:.2%}"
+        )
+
+
+def main() -> None:
+    reporter = PredictionReporter()
+    consumer = Consumer(
+        {
+            "bootstrap.servers": BOOTSTRAP_SERVERS,
+            "group.id": "chess-prediction-reporter",
+            "auto.offset.reset": "latest",
+        }
+    )
+    producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
+    consumer.subscribe(["chess-model-predictions"])
+
+    try:
+        while True:
+            message = consumer.poll(timeout=1.0)
+            if message is None:
+                continue
+            if message.error():
+                if message.error().code() == KafkaError._PARTITION_EOF:
+                    continue
+                raise KafkaException(message.error())
+
+            result = reporter.add_prediction(json.loads(message.value().decode("utf-8")))
+            if result is not None:
+                # The reporter prints only after both model workers scored the same whole game.
+                print_result(result)
+                producer.produce(
+                    "chess-predictions",
+                    key=result["game_id"],
+                    value=json.dumps(result),
+                )
+                producer.poll(0)
+    except KeyboardInterrupt:
+        print("\nStopped prediction reporter.")
+    finally:
+        producer.flush()
+        consumer.close()
+
+
+if __name__ == "__main__":
+    main()

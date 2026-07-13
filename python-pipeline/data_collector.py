@@ -4,7 +4,7 @@ import sys
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from pathlib import Path
 
-from csv_dataset import append_labeled_record
+from csv_dataset import append_labeled_record, should_store_feature_event
 
 folder_path = Path(os.path.dirname(os.getcwd()) + '/ml-model/')
 file_path = "chess_dataset.csv"
@@ -52,7 +52,9 @@ def main():
                 value = msg.value().decode('utf-8') if msg.value() else None
 
                 data_dict = json.loads(msg.value())
-                append_labeled_record(full_path, data_dict, key)
+                # A completion marker closes a live game; it is not a chess move for training.
+                if should_store_feature_event(data_dict):
+                    append_labeled_record(full_path, data_dict, key)
 
     except KeyboardInterrupt:
         print("\nAborted by user.")
@@ -64,5 +66,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

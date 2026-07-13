@@ -69,6 +69,12 @@ class TrainingDataTests(unittest.TestCase):
         self.assertEqual(rows[0]["Cheating"], "0")
         self.assertEqual(rows[1]["Cheating"], "1")
 
+    def test_completion_event_is_not_stored_as_a_training_move(self):
+        csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
+
+        self.assertTrue(csv_dataset.should_store_feature_event({"move_number": 12}))
+        self.assertFalse(csv_dataset.should_store_feature_event({"game_complete": True}))
+
     def test_preparation_excludes_game_ids_and_encodes_remaining_features(self):
         training_data = load_module("training_data", "ml-model/training_data.py")
         dataframe = pd.DataFrame(
@@ -114,6 +120,150 @@ class TrainingDataTests(unittest.TestCase):
         self.assertTrue(train_groups.isdisjoint(test_groups))
         self.assertEqual(train_groups | test_groups, set(groups))
         self.assertFalse(any(column.lower().replace("_", "") == "gameid" for column in features.columns))
+
+    def test_game_preparation_aggregates_moves_into_one_numeric_row_per_game(self):
+        training_data = load_module("training_data", "ml-model/training_data.py")
+        dataframe = pd.DataFrame(
+            {
+                "GameID": ["clean-1", "clean-1", "cheating-1", "cheating-1"],
+                "move_number": [1, 2, 1, 2],
+                "material_balance": [0, 1, 0, 3],
+                "move": ["e4", "e5", "d4", "d5"],
+                "Cheating": [0, 0, 1, 1],
+            }
+        )
+
+        features, labels = training_data.prepare_game_training_data(dataframe)
+
+        self.assertEqual(len(features), 2)
+        self.assertEqual(features.loc["clean-1", "move_number_mean"], 1.5)
+        self.assertEqual(features.loc["clean-1", "move_count"], 2.0)
+        self.assertEqual(labels.loc["cheating-1"], 1.0)
+        self.assertFalse(any("gameid" in column.lower() for column in features.columns))
+        self.assertNotIn("move", features.columns)
+
+    def test_game_preparation_rejects_conflicting_game_labels(self):
+        training_data = load_module("training_data", "ml-model/training_data.py")
+        dataframe = pd.DataFrame(
+            {
+                "GameID": ["game-1", "game-1"],
+                "move_number": [1, 2],
+                "Cheating": [0, 1],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "one Cheating label"):
+            training_data.prepare_game_training_data(dataframe)
+
+    def test_feature_schema_preserves_model_column_order(self):
+        model_artifacts = load_module("model_artifacts", "ml-model/model_artifacts.py")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            model_directory = Path(temporary_directory)
+            saved_path = model_artifacts.save_feature_schema(
+                ["move_count", "time_delta_mean"], model_directory
+            )
+
+            self.assertEqual(saved_path.name, "feature_schema.json")
+            self.assertEqual(
+                model_artifacts.load_feature_schema(model_directory),
+                ["move_count", "time_delta_mean"],
+            )
+
+    def test_model_artifact_path_uses_the_models_directory_not_the_schema_file(self):
+        model_artifacts = load_module("model_artifacts", "ml-model/model_artifacts.py")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            model_directory = Path(temporary_directory)
+            schema_path = model_artifacts.save_feature_schema(["move_count"], model_directory)
+            artifact_path = model_artifacts.model_artifact_path(
+                "pytorch_model.pt", model_directory
+            )
+
+            self.assertEqual(schema_path, model_directory / "feature_schema.json")
+            self.assertEqual(artifact_path, model_directory / "pytorch_model.pt")
+
+    def test_live_scoring_waits_for_completion_and_tracks_model_accuracy(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        tracker = live_scoring.GameScoreTracker(
+            feature_schema=["move_number_mean", "move_count"],
+            pytorch_predict=lambda row: 0.8,
+            xgboost_predict=lambda row: 0.2,
+        )
+
+        tracker.add_feature({"game_id": "game-1 Cheating", "move_number": 1})
+        tracker.add_feature({"game_id": "game-1 Cheating", "move_number": 2})
+
+        self.assertIsNone(tracker.complete_game("missing-game"))
+        result = tracker.complete_game("game-1 Cheating")
+
+        self.assertEqual(result["pytorch_score"], 0.8)
+        self.assertEqual(result["xgboost_score"], 0.2)
+        self.assertEqual(result["pytorch_accuracy"], 1.0)
+        self.assertEqual(result["xgboost_accuracy"], 0.0)
+
+    def test_live_scoring_fills_missing_schema_features_with_zero(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        model_rows = []
+
+        def capture_row(row):
+            model_rows.append(row)
+            return 0.0
+
+        tracker = live_scoring.GameScoreTracker(
+            feature_schema=["material_balance_mean", "move_count"],
+            pytorch_predict=capture_row,
+            xgboost_predict=lambda row: 0.0,
+        )
+        tracker.add_feature({"game_id": "game-2 Clean", "move_number": 1})
+
+        tracker.complete_game("game-2 Clean")
+
+        self.assertEqual(model_rows[0].loc["game-2 Clean", "material_balance_mean"], 0.0)
+
+    def test_game_feature_collector_emits_one_ordered_row_after_completion(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        collector = live_scoring.GameFeatureCollector(
+            ["move_number_mean", "material_balance_last", "move_count"]
+        )
+        collector.add_feature(
+            {"game_id": "game-3 Clean", "move_number": 1, "material_balance": 0}
+        )
+        collector.add_feature(
+            {"game_id": "game-3 Clean", "move_number": 2, "material_balance": 2}
+        )
+
+        result = collector.complete_game("game-3 Clean")
+
+        self.assertEqual(result["game_id"], "game-3 Clean")
+        self.assertEqual(result["features"], {
+            "move_number_mean": 1.5,
+            "material_balance_last": 2.0,
+            "move_count": 2.0,
+        })
+        self.assertIsNone(collector.complete_game("game-3 Clean"))
+
+    def test_prediction_reporter_waits_for_both_model_scores(self):
+        prediction_reporting = load_module(
+            "prediction_reporting", "python-pipeline/prediction_reporting.py"
+        )
+        reporter = prediction_reporting.PredictionReporter()
+
+        self.assertIsNone(reporter.add_prediction({
+            "game_id": "game-4 Cheating", "model": "pytorch", "score": 0.9
+        }))
+        result = reporter.add_prediction({
+            "game_id": "game-4 Cheating", "model": "xgboost", "score": 0.1
+        })
+
+        self.assertEqual(result["pytorch_prediction"], 1)
+        self.assertEqual(result["xgboost_prediction"], 0)
+        self.assertEqual(result["pytorch_accuracy"], 1.0)
+        self.assertEqual(result["xgboost_accuracy"], 0.0)
+
+    def test_live_entry_scripts_import_without_a_pipeline_working_directory(self):
+        load_module("live_game_collector", "python-pipeline/live_game_collector.py")
+        load_module("prediction_reporter", "python-pipeline/prediction_reporter.py")
 
 
 if __name__ == "__main__":

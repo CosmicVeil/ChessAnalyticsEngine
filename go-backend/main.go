@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/corentings/chess/v2"
+	"github.com/segmentio/kafka-go"
 )
 
 type ChessMoveEvent struct {
@@ -22,11 +22,12 @@ type ChessMoveEvent struct {
 }
 
 type FeatureVector struct {
-	GameID      string  `json:"game_id"`
-	MoveNumber  int     `json:"move_number"`
+	GameID          string  `json:"game_id"`
+	MoveNumber      int     `json:"move_number"`
 	MaterialBalance int     `json:"material_balance"`
 	ComplexityScore int     `json:"complexity_score"`
 	TimeDelta       float64 `json:"time_delta"`
+	GameComplete    bool    `json:"game_complete,omitempty"`
 }
 
 type GameInfo struct {
@@ -71,30 +72,30 @@ var chessGames SafeMap = *NewSafeMap()
 
 func main() {
 
-    reader := kafka.NewReader(kafka.ReaderConfig{
-    		Brokers:  []string{"localhost:19092"},
-    		Topic:    "chess-moves",
-    		GroupID:  "chess-state-managers",
-    		MinBytes: 10e3,
-    		MaxBytes: 10e6,
-    		StartOffset: kafka.LastOffset,
-    	})
+	reader := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     []string{"localhost:19092"},
+		Topic:       "chess-moves",
+		GroupID:     "chess-state-managers",
+		MinBytes:    10e3,
+		MaxBytes:    10e6,
+		StartOffset: kafka.LastOffset,
+	})
 
 	writer := kafka.Writer{
-		Addr:  kafka.TCP("localhost:19092"),
-		Topic:    "chess-features",
-		Balancer: &kafka.LeastBytes{},
-		BatchSize: 1,
+		Addr:         kafka.TCP("localhost:19092"),
+		Topic:        "chess-features",
+		Balancer:     &kafka.LeastBytes{},
+		BatchSize:    1,
 		BatchTimeout: 7 * time.Millisecond,
 	}
 
-    defer func() {
+	defer func() {
 
-        if err := reader.Close(); err != nil {
-            log.Printf("failed to close reader: %v", err)
-        }
+		if err := reader.Close(); err != nil {
+			log.Printf("failed to close reader: %v", err)
+		}
 
-    } ()
+	}()
 
 	defer func() {
 		if err := writer.Close(); err != nil {
@@ -102,20 +103,18 @@ func main() {
 		}
 	}()
 
-    ctx := context.Background()
-
+	ctx := context.Background()
 
 	for {
 
 		msg, err := reader.ReadMessage(ctx)
-
 
 		if err != nil {
 			log.Printf("error while reading message: %v", err)
 			break
 		}
 
-        var event ChessMoveEvent
+		var event ChessMoveEvent
 
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
 			log.Println(err)
@@ -129,11 +128,11 @@ func main() {
 		var game *chess.Game
 		var time float64
 
-		gameInfo, exists  = chessGames.Get(event.GameID)
+		gameInfo, exists = chessGames.Get(event.GameID)
 
-		if !exists || event.MoveNumber == 1{
-			chessGames.Set(event.GameID, GameInfo{chess.NewGame(),event.Time})
-			gameInfo,_ = chessGames.Get(event.GameID)
+		if !exists || event.MoveNumber == 1 {
+			chessGames.Set(event.GameID, GameInfo{chess.NewGame(), event.Time})
+			gameInfo, _ = chessGames.Get(event.GameID)
 
 			fmt.Printf("Game %s\n", event.GameID)
 		}
@@ -150,9 +149,9 @@ func main() {
 		var materialImbalance int = findMaterialImbalance(game)
 
 		var currFeatureVector FeatureVector = FeatureVector{GameID: event.GameID,
-			MoveNumber: event.MoveNumber,
+			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
-			TimeDelta: time-event.Time}
+			TimeDelta: time - event.Time}
 
 		//fmt.Println(game.Position().Board().Draw())
 		//fmt.Println(currFeatureVector)
@@ -162,7 +161,7 @@ func main() {
 			log.Fatalf("Error marshaling to JSON: %v", err)
 		}
 
-		err = writer.WriteMessages(ctx, kafka.Message{Key: []byte(event.GameID), Value: jsonData,})
+		err = writer.WriteMessages(ctx, kafka.Message{Key: []byte(event.GameID), Value: jsonData})
 
 		if err != nil {
 			fmt.Printf("Could not write message to writer: %v", err)
@@ -176,9 +175,21 @@ func main() {
 		chessGames.Set(event.GameID, gameInfo)
 
 		if game.Outcome() != chess.NoOutcome {
+			completedGame, err := json.Marshal(FeatureVector{
+				GameID:       event.GameID,
+				GameComplete: true,
+			})
+			if err != nil {
+				log.Printf("could not marshal completed game: %v", err)
+			} else if err := writer.WriteMessages(ctx, kafka.Message{
+				Key:   []byte(event.GameID),
+				Value: completedGame,
+			}); err != nil {
+				log.Printf("could not publish completed game: %v", err)
+			}
 			chessGames.Delete(event.GameID)
 		}
-    }
+	}
 
 }
 
@@ -226,5 +237,3 @@ func findMaterialImbalance(game *chess.Game) int {
 
 	return materialImbalance
 }
-
-

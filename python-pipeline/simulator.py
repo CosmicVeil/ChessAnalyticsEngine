@@ -47,6 +47,12 @@ if __name__ == '__main__':
             break
 
         board = curr_game.board()
+        game_id = (
+            curr_game.headers.get("White")
+            + " vs. "
+            + curr_game.headers.get("Black")
+            + f" #{counter + 1} Clean"
+        )
 
         num_moves = 0
         game_node = curr_game
@@ -60,7 +66,7 @@ if __name__ == '__main__':
             game_node = game_node.next()
 
             payload = {
-                "game_id" : curr_game.headers.get("White") + " vs. " + curr_game.headers.get("Black") + " Clean",
+                "game_id": game_id,
                 "move": san_move,
                 "move_number": num_moves,
                 "White Rating": curr_game.headers.get("WhiteElo"),
@@ -85,6 +91,12 @@ if __name__ == '__main__':
             break
 
         board = curr_game.board()
+        game_id = (
+            curr_game.headers.get("White")
+            + " vs. "
+            + curr_game.headers.get("Black")
+            + f" #{counter + 1} Cheating"
+        )
 
         num_moves = 0
         game_node = curr_game
@@ -98,7 +110,7 @@ if __name__ == '__main__':
             game_node = game_node.next()
 
             payload = {
-                "game_id" : curr_game.headers.get("White") + " vs. " + curr_game.headers.get("Black") + " Cheating",
+                "game_id": game_id,
                 "move": san_move,
                 "move_number": num_moves,
                 "White Rating": curr_game.headers.get("WhiteElo"),
@@ -113,4 +125,3 @@ if __name__ == '__main__':
 
         producer.flush()
         counter+=1
-
