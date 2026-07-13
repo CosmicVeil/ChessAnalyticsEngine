@@ -34,7 +34,7 @@ def main() -> None:
         nn.Sigmoid(),
     ).to(device)
 
-    n_epochs = 100
+    n_epochs = 1000
     loss_fn = nn.BCELoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01)
     model.train()

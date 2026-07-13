@@ -20,11 +20,11 @@ def main() -> None:
     y_train, y_test = y[train_index], y[test_index]
 
     model = XGBClassifier(
-        n_estimators=5000,
-        max_depth=10,
-        learning_rate=0.01,
+        n_estimators=10000,
+        max_depth=20,
+        learning_rate=0.005,
         objective="binary:logistic",
-    ).to(device)
+    )
     print("Starting XGBoost model training...")
     model.fit(X_train, y_train)
     accuracy = (model.predict(X_test) == y_test).mean()
