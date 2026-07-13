@@ -93,6 +93,28 @@ class TrainingDataTests(unittest.TestCase):
         self.assertIn("move_e5", features.columns)
         self.assertNotIn("Cheating", features.columns)
 
+    def test_grouped_split_keeps_every_game_id_in_exactly_one_partition(self):
+        training_data = load_module("training_data", "ml-model/training_data.py")
+        dataframe = pd.DataFrame(
+            {
+                "GameID": ["game-a", "game-a", "game-b", "game-b", "game-c", "game-c"],
+                "move_number": [1, 2, 1, 2, 1, 2],
+                "Cheating": [0, 0, 1, 1, 0, 0],
+            }
+        )
+        features, labels = training_data.prepare_training_data(dataframe)
+        groups = training_data.get_game_ids(dataframe)
+
+        train_index, test_index = training_data.group_train_test_indices(
+            features, labels, groups, train_size=0.5, random_state=42
+        )
+
+        train_groups = set(groups.iloc[train_index])
+        test_groups = set(groups.iloc[test_index])
+        self.assertTrue(train_groups.isdisjoint(test_groups))
+        self.assertEqual(train_groups | test_groups, set(groups))
+        self.assertFalse(any(column.lower().replace("_", "") == "gameid" for column in features.columns))
+
 
 if __name__ == "__main__":
     unittest.main()

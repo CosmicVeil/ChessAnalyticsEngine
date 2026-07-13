@@ -1,7 +1,27 @@
 import pandas as pd
+from sklearn.model_selection import GroupShuffleSplit
 
 
 LABEL_COLUMN = "Cheating"
+
+
+def get_game_ids(dataframe: pd.DataFrame) -> pd.Series:
+    for column in dataframe.columns:
+        if column.lower().replace("_", "") == "gameid":
+            return dataframe[column].astype("string")
+
+    raise ValueError("Dataset must contain a GameID or game_id column for grouped splitting.")
+
+
+def group_train_test_indices(
+    features: pd.DataFrame,
+    labels: pd.Series,
+    game_ids: pd.Series,
+    train_size: float = 0.7,
+    random_state: int = 42,
+) -> tuple[object, object]:
+    splitter = GroupShuffleSplit(n_splits=1, train_size=train_size, random_state=random_state)
+    return next(splitter.split(features, labels, groups=game_ids))
 
 
 def prepare_training_data(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:

@@ -6,6 +6,9 @@ import chess.pgn
 import time
 import json
 
+
+
+# Whole pipeline transfers 1500 games in 1 minute.
 if __name__ == '__main__':
 
     config = {
@@ -35,7 +38,8 @@ if __name__ == '__main__':
                 topic=msg.topic(), key=msg.key().decode('utf-8'), value=msg.value().decode('utf-8')))
 
 
-    while True:
+    counter = 0
+    while counter < 1000:
         curr_game = chess.pgn.read_game(pgn)
 
 
@@ -70,7 +74,10 @@ if __name__ == '__main__':
 
         producer.flush()
 
-    while True:
+        counter+=1
+
+    counter = 0
+    while counter < 500:
         curr_game = chess.pgn.read_game(pgn2)
 
 
@@ -105,4 +112,5 @@ if __name__ == '__main__':
             board.push(move)
 
         producer.flush()
+        counter+=1
 

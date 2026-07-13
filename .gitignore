@@ -1,2 +1,9 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-python-pipeline/venv/bin
+# Local Python environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Downloaded and generated chess datasets (kept locally, never committed)
+data/*.pgn
+ml-model/chess_dataset.csv

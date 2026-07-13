@@ -4,22 +4,26 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
-from training_data import prepare_training_data
+from training_data import get_game_ids, group_train_test_indices, prepare_training_data
 
 
 def main() -> None:
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.mps.is_available() else "cpu")
+    print(device)
+
     dataframe = pd.read_csv(Path(__file__).with_name("chess_dataset.csv"))
     features, labels = prepare_training_data(dataframe)
+    game_ids = get_game_ids(dataframe)
+    train_index, test_index = group_train_test_indices(features, labels, game_ids)
 
     X = torch.tensor(features.values, dtype=torch.float32)
     y = torch.tensor(labels.values, dtype=torch.float32).reshape(-1, 1)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.7, shuffle=True)
-    dataloader = DataLoader(list(zip(X_train, y_train)), shuffle=True, batch_size=2)
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    dataloader = DataLoader(list(zip(X_train, y_train)), shuffle=True, batch_size=64)
 
     model = nn.Sequential(
         nn.Linear(X_train.shape[1], 60),
@@ -56,7 +60,7 @@ def main() -> None:
 
     model.eval()
     y_pred = model(X_test.to(device))
-    accuracy = float((y_pred.round() == y_test).float().mean())
+    accuracy = float((y_pred.round() == y_test.to(device)).float().mean())
     print("PyTorch model accuracy: %.2f%%" % (accuracy * 100))
 
 
