@@ -20,9 +20,9 @@ def main() -> None:
     y_train, y_test = y[train_index], y[test_index]
 
     model = XGBClassifier(
-        n_estimators=10000,
-        max_depth=20,
-        learning_rate=0.005,
+        n_estimators=2000,
+        max_depth=10,
+        learning_rate=0.01,
         objective="binary:logistic",
     )
     print("Starting XGBoost model training...")
