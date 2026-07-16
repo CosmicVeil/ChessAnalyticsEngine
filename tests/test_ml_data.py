@@ -44,19 +44,32 @@ class TrainingDataTests(unittest.TestCase):
             str(REPOSITORY_ROOT / "ml-model" / "train_xgboost.py"),
         ])
 
-    def test_collector_writes_one_complete_row_per_message(self):
+    def test_collector_writes_a_fixed_schema_when_rating_diff_arrives_later(self):
         csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             csv_path = Path(temporary_directory) / "chess_dataset.csv"
             csv_dataset.append_labeled_record(
                 csv_path,
-                {"move": "e4", "move_number": 1, "time": 600},
+                {
+                    "game_id": "Alice vs. Bob Clean",
+                    "move_number": 1,
+                    "material_balance": 0,
+                    "complexity_score": 20,
+                    "time_delta": 600,
+                },
                 "Alice vs. Bob Clean",
             )
             csv_dataset.append_labeled_record(
                 csv_path,
-                {"move": "e5", "move_number": 1, "time": 600},
+                {
+                    "game_id": "Carol vs. Dan Cheating",
+                    "move_number": 1,
+                    "material_balance": 1,
+                    "complexity_score": 22,
+                    "time_delta": 590,
+                    "rating_diff": 125,
+                },
                 "Carol vs. Dan Cheating",
             )
 
@@ -65,9 +78,21 @@ class TrainingDataTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["GameID"], "Alice vs. Bob Clean")
-        self.assertEqual(rows[0]["move"], "e4")
+        self.assertEqual(rows[0]["rating_diff"], "")
         self.assertEqual(rows[0]["Cheating"], "0")
+        self.assertEqual(rows[1]["rating_diff"], "125")
         self.assertEqual(rows[1]["Cheating"], "1")
+
+    def test_reset_labeled_dataset_removes_the_previous_csv(self):
+        csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            csv_path = Path(temporary_directory) / "chess_dataset.csv"
+            csv_path.write_text("old,data\n", encoding="utf-8")
+
+            csv_dataset.reset_labeled_dataset(csv_path)
+
+            self.assertFalse(csv_path.exists())
 
     def test_completion_event_is_not_stored_as_a_training_move(self):
         csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")

@@ -4,7 +4,7 @@ import sys
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from pathlib import Path
 
-from csv_dataset import append_labeled_record, should_store_feature_event
+from csv_dataset import append_labeled_record, reset_labeled_dataset, should_store_feature_event
 
 folder_path = Path(os.path.dirname(os.getcwd()) + '/ml-model/')
 file_path = "chess_dataset.csv"
@@ -24,13 +24,13 @@ def create_consumer():
     return Consumer(config)
 
 def main():
+    # Delete the prior dataset before consuming so this run cannot mix CSV schemas.
+    reset_labeled_dataset(full_path)
     consumer = create_consumer()
 
     topics = ['chess-features']
 
     consumer.subscribe(topics)
-
-    full_path.unlink(missing_ok=True)
 
     try:
         while True:
@@ -66,4 +66,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

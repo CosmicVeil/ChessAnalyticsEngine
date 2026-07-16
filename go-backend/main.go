@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type FeatureVector struct {
 	ComplexityScore int     `json:"complexity_score"`
 	TimeDelta       float64 `json:"time_delta"`
 	GameComplete    bool    `json:"game_complete,omitempty"`
+	RatingDiff      int     `json:"rating_diff"`
 }
 
 type GameInfo struct {
@@ -148,10 +150,20 @@ func main() {
 
 		var materialImbalance int = findMaterialImbalance(game)
 
+		var multiplier int = -1
+
+		if event.MoveNumber % 2 == 1{
+			multiplier = 1
+		}
+
+		whiteRating, err := strconv.Atoi(event.WhiteRating)
+		blackRating, err := strconv.Atoi(event.BlackRating)
+
 		var currFeatureVector FeatureVector = FeatureVector{GameID: event.GameID,
 			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
-			TimeDelta: time - event.Time}
+			TimeDelta: time - event.Time,
+		RatingDiff: multiplier*(whiteRating-blackRating)}
 
 		//fmt.Println(game.Position().Board().Draw())
 		//fmt.Println(currFeatureVector)
