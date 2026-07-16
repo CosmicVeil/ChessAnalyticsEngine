@@ -2,6 +2,6 @@ An analytical chess engine was used to predict whether a game was clean, or a ch
 
 This architecture uses a Kafka-based streaming pipeline to process 1500 games per second into a PyTorch ReLu and an XGBoost model.
 
-Predictions are ~ 88% accurate for PyTorch, and ~91$ accuracy for XGBoost.
+Predictions are ~ 78% accurate for PyTorch, and ~ 82% accuracy for XGBoost.
 
-The rate of false positives is <1%, a key analytic to prevent real games from being falsely reported as AI.
+The rate of false positives is <5%, a key analytic to prevent real games from being falsely reported as AI.
