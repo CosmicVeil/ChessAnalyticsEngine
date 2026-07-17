@@ -1,17 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
-
 	"github.com/corentings/chess/v2"
 	"github.com/segmentio/kafka-go"
 )
+
+const chessAPIURL = "https://chess-api.com/v1"
 
 type ChessMoveEvent struct {
 	GameID      string  `json:"game_id"`
@@ -33,6 +37,10 @@ type FeatureVector struct {
 	NumMinorPieces  int     `json:"num_minor_pieces"`
 	NumMajorPieces  int     `json:"num_major_pieces"`
 	MaterialSwings  int `json:"material_swings"`
+	CentipawnLoss   int `json:"centipawn_loss"`
+	Evaluation int `json:"evaluation"`
+	WinChance  float64 `json:"win_chance"`
+	Mate       int `json:"mate"`
 }
 
 type GameInfo struct {
@@ -44,6 +52,27 @@ type SafeMap struct {
 	mu   sync.RWMutex
 	data map[string]GameInfo
 }
+
+type Analysis struct {
+	CentipawnLoss int
+	Evaluation    int
+	WinChance     float64
+	Mate          *int
+}
+
+type apiResponse struct {
+	Centipawns int
+	WinChance  float64
+	Mate       *int
+}
+
+type apiWireResponse struct {
+	Centipawns string  `json:"centipawns"`
+	WinChance  float64 `json:"winChance"`
+	Mate       *int    `json:"mate"`
+	Error      string  `json:"error"`
+}
+
 
 func NewSafeMap() *SafeMap {
 	return &SafeMap{
@@ -151,6 +180,8 @@ func main() {
 			continue
 		}
 
+		currAnalysis, _ := AnalyzeLastMove(ctx, game)
+
 		var materialImbalance int = findMaterialImbalance(game)
 
 		var multiplier int = -1
@@ -162,12 +193,20 @@ func main() {
 		whiteRating, err := strconv.Atoi(event.WhiteRating)
 		blackRating, err := strconv.Atoi(event.BlackRating)
 
+		var mate int = 0
+
+
+		if currAnalysis.Mate != nil {
+			mate = *currAnalysis.Mate
+		}
+
 		var currFeatureVector FeatureVector = FeatureVector{GameID: event.GameID,
 			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
 			TimeDelta: time - event.Time,
 		RatingDiff: multiplier*(whiteRating-blackRating),
-		NumMajorPieces: findNumMajorPieces(game, event.MoveNumber), NumMinorPieces: findNumMinorPieces(game, event.MoveNumber)}
+		NumMajorPieces: findNumMajorPieces(game, event.MoveNumber), NumMinorPieces: findNumMinorPieces(game, event.MoveNumber),
+		CentipawnLoss: currAnalysis.CentipawnLoss, WinChance: currAnalysis.WinChance, Mate: mate, Evaluation: currAnalysis.Evaluation}
 
 		//fmt.Println(game.Position().Board().Draw())
 		//fmt.Println(currFeatureVector)
@@ -309,3 +348,84 @@ func findNumMajorPieces(game *chess.Game, moveNumber int) int {
 
 	return numPieces
 }
+
+func AnalyzeLastMove(ctx context.Context, game *chess.Game) (Analysis, error) {
+	return analyzeLastMove(ctx, game, chessAPIURL, http.DefaultClient)
+}
+
+func analyzeLastMove(ctx context.Context, game *chess.Game, endpoint string, client *http.Client) (Analysis, error) {
+	if game == nil {
+		return Analysis{}, errors.New("chess game is nil")
+	}
+	history := game.MoveHistory()
+	if len(history) == 0 {
+		return Analysis{}, errors.New("chess game has no moves")
+	}
+
+	last := history[len(history)-1]
+	before, err := evaluateFEN(ctx, endpoint, client, last.PrePosition.String())
+	if err != nil {
+		return Analysis{}, err
+	}
+	after, err := evaluateFEN(ctx, endpoint, client, last.PostPosition.String())
+	if err != nil {
+		return Analysis{}, err
+	}
+
+	loss := before.Centipawns - after.Centipawns
+	if last.PrePosition.Turn() == chess.Black {
+		loss = -loss
+	}
+	if loss < 0 {
+		loss = 0
+	}
+	return Analysis{
+		CentipawnLoss: loss,
+		Evaluation:    after.Centipawns,
+		WinChance:     after.WinChance,
+		Mate:          after.Mate,
+	}, nil
+}
+
+func evaluateFEN(ctx context.Context, endpoint string, client *http.Client, fen string) (apiResponse, error) {
+	body, err := json.Marshal(struct {
+		FEN string `json:"fen"`
+	}{FEN: fen})
+	if err != nil {
+		return apiResponse{}, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return apiResponse{}, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return apiResponse{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return apiResponse{}, fmt.Errorf("chess API returned %s", response.Status)
+	}
+
+	var wire apiWireResponse
+	if err := json.NewDecoder(response.Body).Decode(&wire); err != nil {
+		return apiResponse{}, err
+	}
+	if wire.Error != "" {
+		return apiResponse{}, errors.New(wire.Error)
+	}
+	centipawns, err := strconv.Atoi(wire.Centipawns)
+	if err != nil {
+		return apiResponse{}, fmt.Errorf("invalid centipawns: %w", err)
+	}
+
+	return apiResponse{
+		Centipawns: centipawns,
+		WinChance:  wire.WinChance,
+		Mate:       wire.Mate,
+	}, nil
+}
+
