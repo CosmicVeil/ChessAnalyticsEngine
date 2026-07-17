@@ -30,6 +30,9 @@ type FeatureVector struct {
 	TimeDelta       float64 `json:"time_delta"`
 	GameComplete    bool    `json:"game_complete,omitempty"`
 	RatingDiff      int     `json:"rating_diff"`
+	NumMinorPieces  int     `json:"num_minor_pieces"`
+	NumMajorPieces  int     `json:"num_major_pieces"`
+	MaterialSwings  int `json:"material_swings"`
 }
 
 type GameInfo struct {
@@ -163,7 +166,8 @@ func main() {
 			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
 			TimeDelta: time - event.Time,
-		RatingDiff: multiplier*(whiteRating-blackRating)}
+		RatingDiff: multiplier*(whiteRating-blackRating),
+		NumMajorPieces: findNumMajorPieces(game, event.MoveNumber), NumMinorPieces: findNumMinorPieces(game, event.MoveNumber)}
 
 		//fmt.Println(game.Position().Board().Draw())
 		//fmt.Println(currFeatureVector)
@@ -248,4 +252,60 @@ func findMaterialImbalance(game *chess.Game) int {
 	}
 
 	return materialImbalance
+}
+
+func findNumMinorPieces(game *chess.Game, moveNumber int) int {
+	var numPieces int = 0
+	var pieceMap map[chess.Square]chess.Piece = game.Position().Board().SquareMap()
+
+	for key := range pieceMap {
+
+		if pieceMap[key].Color() == chess.Black && moveNumber %2 ==0{
+
+			switch pieceMap[key].Type() {
+				case chess.Knight:
+					numPieces += 1
+				case chess.Bishop:
+					numPieces += 1
+			}
+
+		} else if pieceMap[key].Color() == chess.White && moveNumber %2 == 1{
+			switch pieceMap[key].Type() {
+			case chess.Knight:
+				numPieces += 1
+			case chess.Bishop:
+				numPieces += 1
+			}
+		}
+	}
+
+	return numPieces
+}
+
+func findNumMajorPieces(game *chess.Game, moveNumber int) int {
+	var numPieces int = 0
+	var pieceMap map[chess.Square]chess.Piece = game.Position().Board().SquareMap()
+
+	for key := range pieceMap {
+
+		if pieceMap[key].Color() == chess.Black && moveNumber %2 ==0{
+
+			switch pieceMap[key].Type() {
+			case chess.Rook:
+				numPieces += 1
+			case chess.Queen:
+				numPieces += 1
+			}
+
+		} else if pieceMap[key].Color() == chess.White && moveNumber %2 == 1{
+			switch pieceMap[key].Type() {
+			case chess.Rook:
+				numPieces += 1
+			case chess.Queen:
+				numPieces += 1
+			}
+		}
+	}
+
+	return numPieces
 }

@@ -28,7 +28,7 @@ def main() -> None:
 
     model = build_pytorch_model(X_train.shape[1]).to(device)
 
-    n_epochs = 100
+    n_epochs = 500
     loss_fn = nn.BCELoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01)
     model.train()
