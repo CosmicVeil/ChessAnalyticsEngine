@@ -25,6 +25,13 @@ def create_consumer():
 
 def main():
     # Delete the prior dataset before consuming so this run cannot mix CSV schemas.
+
+    userAnswer = input("Are you sure you want to store the new CSV data? The previous CSV will be deleted. (Y/n)")
+
+    if userAnswer == "n":
+        sys.exit()
+
+
     reset_labeled_dataset(full_path)
     consumer = create_consumer()
 
