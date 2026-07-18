@@ -14,6 +14,7 @@ if str(MODEL_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(MODEL_DIRECTORY))
 
 from model_artifacts import MODELS_DIRECTORY, build_pytorch_model, load_feature_schema
+from kafka_delivery import publish_and_commit
 
 
 BOOTSTRAP_SERVERS = "localhost:19092"
@@ -35,6 +36,8 @@ def main() -> None:
             "bootstrap.servers": BOOTSTRAP_SERVERS,
             "group.id": "chess-pytorch-game-inference",
             "auto.offset.reset": "latest",
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
@@ -57,16 +60,18 @@ def main() -> None:
             )
             with torch.no_grad():
                 score = float(model(torch.tensor(features.values, dtype=torch.float32)).item())
-            producer.produce(
+            publish_and_commit(
+                producer,
+                consumer,
+                message,
                 "chess-model-predictions",
-                key=completed_game["game_id"],
-                value=json.dumps({
+                completed_game["game_id"],
+                json.dumps({
                     "game_id": completed_game["game_id"],
                     "model": "pytorch",
                     "score": score,
                 }),
             )
-            producer.poll(0)
     except KeyboardInterrupt:
         print("\nStopped PyTorch game inference.")
     finally:

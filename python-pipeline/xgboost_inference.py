@@ -14,6 +14,7 @@ if str(MODEL_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(MODEL_DIRECTORY))
 
 from model_artifacts import MODELS_DIRECTORY, load_feature_schema
+from kafka_delivery import publish_and_commit
 
 
 BOOTSTRAP_SERVERS = "localhost:19092"
@@ -33,6 +34,8 @@ def main() -> None:
             "bootstrap.servers": BOOTSTRAP_SERVERS,
             "group.id": "chess-xgboost-game-inference",
             "auto.offset.reset": "latest",
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
@@ -54,16 +57,18 @@ def main() -> None:
                 columns=feature_schema, fill_value=0.0
             )
             score = float(model.predict_proba(features)[0, 1])
-            producer.produce(
+            publish_and_commit(
+                producer,
+                consumer,
+                message,
                 "chess-model-predictions",
-                key=completed_game["game_id"],
-                value=json.dumps({
+                completed_game["game_id"],
+                json.dumps({
                     "game_id": completed_game["game_id"],
                     "model": "xgboost",
                     "score": score,
                 }),
             )
-            producer.poll(0)
     except KeyboardInterrupt:
         print("\nStopped XGBoost game inference.")
     finally:

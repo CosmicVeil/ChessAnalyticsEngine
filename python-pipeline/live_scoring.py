@@ -30,11 +30,16 @@ class GameFeatureCollector:
         game_id = event.get("game_id")
         if not game_id:
             raise ValueError("Feature event must contain a game_id.")
+        move_number = event.get("move_number")
+        if move_number is not None and any(
+            record.get("move_number") == move_number for record in self.records[game_id]
+        ):
+            return
         self.records[game_id].append(event)
 
-    def complete_game(self, game_id: str) -> dict | None:
-        """Aggregate all moves from a finished game into the training-time schema."""
-        records = self.records.pop(game_id, None)
+    def prepare_completed_game(self, game_id: str) -> dict | None:
+        """Build a completed-game vector without discarding retryable move state."""
+        records = self.records.get(game_id)
         if not records:
             return None
 
@@ -49,6 +54,17 @@ class GameFeatureCollector:
                 for column, value in game_features.iloc[0].items()
             },
         }
+
+    def discard_game(self, game_id: str) -> None:
+        """Remove state only after its completed-game event was delivered."""
+        self.records.pop(game_id, None)
+
+    def complete_game(self, game_id: str) -> dict | None:
+        """Aggregate and discard a finished game for callers with no delivery step."""
+        completed_game = self.prepare_completed_game(game_id)
+        if completed_game is not None:
+            self.discard_game(game_id)
+        return completed_game
 
 
 class GameScoreTracker:

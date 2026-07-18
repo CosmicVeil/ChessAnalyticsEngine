@@ -83,6 +83,62 @@ class TrainingDataTests(unittest.TestCase):
         self.assertEqual(rows[1]["rating_diff"], "125")
         self.assertEqual(rows[1]["Cheating"], "1")
 
+    def test_collector_preserves_snake_case_analysis_features(self):
+        csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            csv_path = Path(temporary_directory) / "chess_dataset.csv"
+            csv_dataset.append_labeled_record(
+                csv_path,
+                {
+                    "game_id": "analysis-game Clean",
+                    "move_number": 1,
+                    "centipawn_loss": 37,
+                    "evaluation": -18,
+                    "win_chance": 0.42,
+                    "mate": 0,
+                    "num_major_pieces": 6,
+                    "num_minor_pieces": 4,
+                    "material_swings": 2,
+                },
+                "analysis-game Clean",
+            )
+
+            with csv_path.open(newline="") as csv_file:
+                row = next(csv.DictReader(csv_file))
+
+        self.assertEqual(row["centipawn_loss"], "37")
+        self.assertEqual(row["evaluation"], "-18")
+        self.assertEqual(row["win_chance"], "0.42")
+        self.assertEqual(row["num_major_pieces"], "6")
+
+    def test_delivery_helper_flushes_before_committing_the_message(self):
+        kafka_delivery = load_module("kafka_delivery", "python-pipeline/kafka_delivery.py")
+        call_order = []
+
+        class FakeProducer:
+            def produce(self, topic, key, value):
+                call_order.append(("produce", topic, key, value))
+
+            def flush(self):
+                call_order.append(("flush",))
+                return 0
+
+        class FakeConsumer:
+            def commit(self, message, asynchronous):
+                call_order.append(("commit", message, asynchronous))
+
+        message = object()
+        kafka_delivery.publish_and_commit(
+            FakeProducer(), FakeConsumer(), message, "output-topic", "game-1", "payload"
+        )
+
+        self.assertEqual(call_order, [
+            ("produce", "output-topic", "game-1", "payload"),
+            ("flush",),
+            ("commit", message, False),
+        ])
+
     def test_reset_labeled_dataset_removes_the_previous_csv(self):
         csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
 
@@ -267,6 +323,29 @@ class TrainingDataTests(unittest.TestCase):
             "move_count": 2.0,
         })
         self.assertIsNone(collector.complete_game("game-3 Clean"))
+
+    def test_game_feature_collector_keeps_a_completed_game_until_delivery_succeeds(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        collector = live_scoring.GameFeatureCollector(["move_count"])
+        collector.add_feature({"game_id": "game-5 Clean", "move_number": 1})
+
+        completed_game = collector.prepare_completed_game("game-5 Clean")
+
+        self.assertEqual(completed_game["features"]["move_count"], 1.0)
+        self.assertIsNotNone(collector.prepare_completed_game("game-5 Clean"))
+        collector.discard_game("game-5 Clean")
+        self.assertIsNone(collector.prepare_completed_game("game-5 Clean"))
+
+    def test_game_feature_collector_ignores_a_replayed_move(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        collector = live_scoring.GameFeatureCollector(["move_count"])
+        move = {"game_id": "game-6 Clean", "move_number": 1}
+
+        collector.add_feature(move)
+        collector.add_feature(move)
+
+        completed_game = collector.prepare_completed_game("game-6 Clean")
+        self.assertEqual(completed_game["features"]["move_count"], 1.0)
 
     def test_prediction_reporter_waits_for_both_model_scores(self):
         prediction_reporting = load_module(

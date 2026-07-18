@@ -17,6 +17,7 @@ if str(MODEL_DIRECTORY) not in sys.path:
 
 from model_artifacts import load_feature_schema
 from live_scoring import GameFeatureCollector
+from kafka_delivery import commit_after_processing, publish_and_commit
 
 
 BOOTSTRAP_SERVERS = "localhost:19092"
@@ -31,6 +32,8 @@ def main() -> None:
             "bootstrap.servers": BOOTSTRAP_SERVERS,
             "group.id": "chess-game-feature-collector",
             "auto.offset.reset": "latest",
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
@@ -49,16 +52,22 @@ def main() -> None:
             event = json.loads(message.value().decode("utf-8"))
             game_id = event.get("game_id")
             if event.get("game_complete"):
-                completed_game = collector.complete_game(game_id)
+                completed_game = collector.prepare_completed_game(game_id)
                 if completed_game is not None:
-                    producer.produce(
+                    publish_and_commit(
+                        producer,
+                        consumer,
+                        message,
                         "chess-game-features",
-                        key=game_id,
-                        value=json.dumps(completed_game),
+                        game_id,
+                        json.dumps(completed_game),
                     )
-                    producer.poll(0)
+                    collector.discard_game(game_id)
+                else:
+                    commit_after_processing(consumer, message)
             else:
                 collector.add_feature(event)
+                commit_after_processing(consumer, message)
     except KeyboardInterrupt:
         print("\nStopped game feature collector.")
     finally:

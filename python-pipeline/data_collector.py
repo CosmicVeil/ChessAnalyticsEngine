@@ -5,6 +5,7 @@ from confluent_kafka import Consumer, KafkaException, KafkaError
 from pathlib import Path
 
 from csv_dataset import append_labeled_record, reset_labeled_dataset, should_store_feature_event
+from kafka_delivery import commit_after_processing
 
 folder_path = Path(os.path.dirname(os.getcwd()) + '/ml-model/')
 file_path = "chess_dataset.csv"
@@ -17,8 +18,8 @@ def create_consumer():
         'bootstrap.servers': 'localhost:19092',
         'group.id': 'chess-features-consumer',
         'auto.offset.reset': 'earliest',
-        'enable.auto.commit': True,
-        'auto.commit.interval.ms': 5000
+        'enable.auto.commit': False,
+        'enable.auto.offset.store': False,
     }
 
     return Consumer(config)
@@ -52,7 +53,7 @@ def main():
                     print(f"Reached end of partition: {msg.topic()} [{msg.partition()}]")
 
                 else:
-                    raise KafkaException(msg.error)
+                    raise KafkaException(msg.error())
 
             else:
                 key = msg.key().decode('utf-8') if msg.key() else None
@@ -62,6 +63,7 @@ def main():
                 # A completion marker closes a live game; it is not a chess move for training.
                 if should_store_feature_event(data_dict):
                     append_labeled_record(full_path, data_dict, key)
+                commit_after_processing(consumer, msg)
 
     except KeyboardInterrupt:
         print("\nAborted by user.")

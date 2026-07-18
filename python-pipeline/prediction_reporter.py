@@ -13,6 +13,7 @@ if str(PIPELINE_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(PIPELINE_DIRECTORY))
 
 from prediction_reporting import PredictionReporter
+from kafka_delivery import commit_after_processing, publish_and_commit
 
 
 BOOTSTRAP_SERVERS = "localhost:19092"
@@ -48,6 +49,8 @@ def main() -> None:
             "bootstrap.servers": BOOTSTRAP_SERVERS,
             "group.id": "chess-prediction-reporter",
             "auto.offset.reset": "latest",
+            "enable.auto.commit": False,
+            "enable.auto.offset.store": False,
         }
     )
     producer = Producer({"bootstrap.servers": BOOTSTRAP_SERVERS})
@@ -77,12 +80,16 @@ def main() -> None:
                 start_time = time.perf_counter()
 
 
-                producer.produce(
+                publish_and_commit(
+                    producer,
+                    consumer,
+                    message,
                     "chess-predictions",
-                    key=result["game_id"],
-                    value=json.dumps(result),
+                    result["game_id"],
+                    json.dumps(result),
                 )
-                producer.poll(0)
+            else:
+                commit_after_processing(consumer, message)
     except KeyboardInterrupt:
         print("\nStopped prediction reporter.")
         print(f"Average Time: {total_time_taken/total_games:.6f}")

@@ -6,16 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/corentings/chess/v2"
+	"github.com/segmentio/kafka-go"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
-	"github.com/corentings/chess/v2"
-	"github.com/segmentio/kafka-go"
 )
 
 const chessAPIURL = "https://chess-api.com/v1"
+
+var chessAPIClient = &http.Client{Timeout: 5 * time.Second}
 
 type ChessMoveEvent struct {
 	GameID      string  `json:"game_id"`
@@ -36,16 +38,21 @@ type FeatureVector struct {
 	RatingDiff      int     `json:"rating_diff"`
 	NumMinorPieces  int     `json:"num_minor_pieces"`
 	NumMajorPieces  int     `json:"num_major_pieces"`
-	MaterialSwings  int `json:"material_swings"`
-	CentipawnLoss   int `json:"centipawn_loss"`
-	Evaluation int `json:"evaluation"`
-	WinChance  float64 `json:"win_chance"`
-	Mate       int `json:"mate"`
+	MaterialSwings  int     `json:"material_swings"`
+	CentipawnLoss   int     `json:"centipawn_loss"`
+	Evaluation      int     `json:"evaluation"`
+	WinChance       float64 `json:"win_chance"`
+	Mate            int     `json:"mate"`
 }
 
 type GameInfo struct {
-	Game *chess.Game
-	time float64
+	Game       *chess.Game
+	time       float64
+	MoveNumber int
+}
+
+type messageCommitter interface {
+	CommitMessages(context.Context, ...kafka.Message) error
 }
 
 type SafeMap struct {
@@ -73,11 +80,14 @@ type apiWireResponse struct {
 	Error      string  `json:"error"`
 }
 
-
 func NewSafeMap() *SafeMap {
 	return &SafeMap{
 		data: make(map[string]GameInfo),
 	}
+}
+
+func commitProcessedMessage(ctx context.Context, committer messageCommitter, message kafka.Message) error {
+	return committer.CommitMessages(ctx, message)
 }
 
 // Set adds or updates an item in the map.
@@ -118,7 +128,7 @@ func main() {
 	writer := kafka.Writer{
 		Addr:         kafka.TCP("localhost:19092"),
 		Topic:        "chess-features",
-		Balancer:     &kafka.LeastBytes{},
+		Balancer:     &kafka.CRC32Balancer{},
 		BatchSize:    1,
 		BatchTimeout: 7 * time.Millisecond,
 	}
@@ -141,7 +151,7 @@ func main() {
 
 	for {
 
-		msg, err := reader.ReadMessage(ctx)
+		msg, err := reader.FetchMessage(ctx)
 
 		if err != nil {
 			log.Printf("error while reading message: %v", err)
@@ -151,7 +161,11 @@ func main() {
 		var event ChessMoveEvent
 
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
-			log.Println(err)
+			log.Printf("invalid chess-move message: %v", err)
+			if err := commitProcessedMessage(ctx, reader, msg); err != nil {
+				log.Printf("could not acknowledge invalid chess-move message: %v", err)
+				return
+			}
 			continue
 		}
 
@@ -164,29 +178,58 @@ func main() {
 
 		gameInfo, exists = chessGames.Get(event.GameID)
 
-		if !exists || event.MoveNumber == 1 {
-			chessGames.Set(event.GameID, GameInfo{chess.NewGame(), event.Time})
-			gameInfo, _ = chessGames.Get(event.GameID)
-
-			fmt.Printf("Game %s\n", event.GameID)
+		if exists && event.MoveNumber <= gameInfo.MoveNumber {
+			if err := commitProcessedMessage(ctx, reader, msg); err != nil {
+				log.Printf("could not acknowledge replayed game %s move %d: %v", event.GameID, event.MoveNumber, err)
+				return
+			}
+			continue
 		}
 
-		game, time = gameInfo.Game, gameInfo.time
+		if !exists {
+			if event.MoveNumber != 1 {
+				log.Printf("game %s started at move %d; waiting for a replay from move 1", event.GameID, event.MoveNumber)
+				return
+			}
+			gameInfo = GameInfo{Game: chess.NewGame(), time: event.Time}
+			fmt.Printf("Game %s\n", event.GameID)
+		} else if event.MoveNumber != gameInfo.MoveNumber+1 {
+			log.Printf("game %s received move %d after move %d; waiting for ordered replay", event.GameID, event.MoveNumber, gameInfo.MoveNumber)
+			return
+		}
+
+		game, time = gameInfo.Game.Clone(), gameInfo.time
 
 		var err2 error = game.PushNotationMove(event.Move, chess.AlgebraicNotation{}, nil)
 
 		if err2 != nil {
-			fmt.Printf("game %s skipped move %s: %v\n", event.GameID, event.Move, err2)
+			log.Printf("game %s has invalid move %s: %v", event.GameID, event.Move, err2)
+			if err := commitProcessedMessage(ctx, reader, msg); err != nil {
+				log.Printf("could not acknowledge invalid game %s move %d: %v", event.GameID, event.MoveNumber, err)
+				return
+			}
 			continue
 		}
 
-		currAnalysis, _ := AnalyzeLastMove(ctx, game)
+		// Temporarily disabled: the Chess API rate limit cannot support one request
+		// for the position before and after every move. Re-enable this block when a
+		// higher request allowance or a local engine is available.
+		var currAnalysis Analysis
+		// currAnalysis, analysisErr := AnalyzeLastMove(ctx, game)
+		// if analysisErr != nil {
+		// 	log.Printf(
+		// 		"game %s move %d: Chess API analysis unavailable: %v",
+		// 		event.GameID,
+		// 		event.MoveNumber,
+		// 		analysisErr,
+		// 	)
+		// }
 
 		var materialImbalance int = findMaterialImbalance(game)
 
 		var multiplier int = -1
 
-		if event.MoveNumber % 2 == 1{
+		if event.MoveNumber%2 == 1 {
 			multiplier = 1
 		}
 
@@ -195,7 +238,6 @@ func main() {
 
 		var mate int = 0
 
-
 		if currAnalysis.Mate != nil {
 			mate = *currAnalysis.Mate
 		}
@@ -203,31 +245,27 @@ func main() {
 		var currFeatureVector FeatureVector = FeatureVector{GameID: event.GameID,
 			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
-			TimeDelta: time - event.Time,
-		RatingDiff: multiplier*(whiteRating-blackRating),
-		NumMajorPieces: findNumMajorPieces(game, event.MoveNumber), NumMinorPieces: findNumMinorPieces(game, event.MoveNumber),
-		CentipawnLoss: currAnalysis.CentipawnLoss, WinChance: currAnalysis.WinChance, Mate: mate, Evaluation: currAnalysis.Evaluation}
+			TimeDelta:      time - event.Time,
+			RatingDiff:     multiplier * (whiteRating - blackRating),
+			NumMajorPieces: findNumMajorPieces(game, event.MoveNumber), NumMinorPieces: findNumMinorPieces(game, event.MoveNumber),
+			MaterialSwings: findMaterialSwings(game),
+			CentipawnLoss:  currAnalysis.CentipawnLoss, WinChance: currAnalysis.WinChance, Mate: mate, Evaluation: currAnalysis.Evaluation}
 
 		//fmt.Println(game.Position().Board().Draw())
 		//fmt.Println(currFeatureVector)
 
 		jsonData, err := json.Marshal(currFeatureVector)
 		if err != nil {
-			log.Fatalf("Error marshaling to JSON: %v", err)
+			log.Printf("could not marshal feature for game %s move %d: %v", event.GameID, event.MoveNumber, err)
+			return
 		}
 
 		err = writer.WriteMessages(ctx, kafka.Message{Key: []byte(event.GameID), Value: jsonData})
 
 		if err != nil {
-			fmt.Printf("Could not write message to writer: %v", err)
+			log.Printf("could not publish feature for game %s move %d: %v", event.GameID, event.MoveNumber, err)
+			return
 		}
-
-		if err != nil {
-			log.Fatalf("could not write messages: %v", err)
-		}
-
-		gameInfo.time = event.Time
-		chessGames.Set(event.GameID, gameInfo)
 
 		if game.Outcome() != chess.NoOutcome {
 			completedGame, err := json.Marshal(FeatureVector{
@@ -235,13 +273,29 @@ func main() {
 				GameComplete: true,
 			})
 			if err != nil {
-				log.Printf("could not marshal completed game: %v", err)
+				log.Printf("could not marshal completed game %s: %v", event.GameID, err)
+				return
 			} else if err := writer.WriteMessages(ctx, kafka.Message{
 				Key:   []byte(event.GameID),
 				Value: completedGame,
 			}); err != nil {
-				log.Printf("could not publish completed game: %v", err)
+				log.Printf("could not publish completed game %s: %v", event.GameID, err)
+				return
 			}
+		} else {
+			chessGames.Set(event.GameID, GameInfo{
+				Game:       game,
+				time:       event.Time,
+				MoveNumber: event.MoveNumber,
+			})
+		}
+
+		if err := commitProcessedMessage(ctx, reader, msg); err != nil {
+			log.Printf("could not acknowledge game %s move %d: %v", event.GameID, event.MoveNumber, err)
+			return
+		}
+
+		if game.Outcome() != chess.NoOutcome {
 			chessGames.Delete(event.GameID)
 		}
 	}
@@ -249,9 +303,13 @@ func main() {
 }
 
 func findMaterialImbalance(game *chess.Game) int {
+	return findMaterialImbalanceForPosition(game.Position())
+}
+
+func findMaterialImbalanceForPosition(position *chess.Position) int {
 
 	var materialImbalance int = 0
-	var pieceMap map[chess.Square]chess.Piece = game.Position().Board().SquareMap()
+	var pieceMap map[chess.Square]chess.Piece = position.Board().SquareMap()
 
 	for key := range pieceMap {
 
@@ -293,22 +351,37 @@ func findMaterialImbalance(game *chess.Game) int {
 	return materialImbalance
 }
 
+func findMaterialSwings(game *chess.Game) int {
+	history := game.MoveHistory()
+	if len(history) == 0 {
+		return 0
+	}
+
+	lastMove := history[len(history)-1]
+	change := findMaterialImbalanceForPosition(lastMove.PostPosition) -
+		findMaterialImbalanceForPosition(lastMove.PrePosition)
+	if change < 0 {
+		return -change
+	}
+	return change
+}
+
 func findNumMinorPieces(game *chess.Game, moveNumber int) int {
 	var numPieces int = 0
 	var pieceMap map[chess.Square]chess.Piece = game.Position().Board().SquareMap()
 
 	for key := range pieceMap {
 
-		if pieceMap[key].Color() == chess.Black && moveNumber %2 ==0{
+		if pieceMap[key].Color() == chess.Black && moveNumber%2 == 0 {
 
 			switch pieceMap[key].Type() {
-				case chess.Knight:
-					numPieces += 1
-				case chess.Bishop:
-					numPieces += 1
+			case chess.Knight:
+				numPieces += 1
+			case chess.Bishop:
+				numPieces += 1
 			}
 
-		} else if pieceMap[key].Color() == chess.White && moveNumber %2 == 1{
+		} else if pieceMap[key].Color() == chess.White && moveNumber%2 == 1 {
 			switch pieceMap[key].Type() {
 			case chess.Knight:
 				numPieces += 1
@@ -327,7 +400,7 @@ func findNumMajorPieces(game *chess.Game, moveNumber int) int {
 
 	for key := range pieceMap {
 
-		if pieceMap[key].Color() == chess.Black && moveNumber %2 ==0{
+		if pieceMap[key].Color() == chess.Black && moveNumber%2 == 0 {
 
 			switch pieceMap[key].Type() {
 			case chess.Rook:
@@ -336,7 +409,7 @@ func findNumMajorPieces(game *chess.Game, moveNumber int) int {
 				numPieces += 1
 			}
 
-		} else if pieceMap[key].Color() == chess.White && moveNumber %2 == 1{
+		} else if pieceMap[key].Color() == chess.White && moveNumber%2 == 1 {
 			switch pieceMap[key].Type() {
 			case chess.Rook:
 				numPieces += 1
@@ -350,7 +423,7 @@ func findNumMajorPieces(game *chess.Game, moveNumber int) int {
 }
 
 func AnalyzeLastMove(ctx context.Context, game *chess.Game) (Analysis, error) {
-	return analyzeLastMove(ctx, game, chessAPIURL, http.DefaultClient)
+	return analyzeLastMove(ctx, game, chessAPIURL, chessAPIClient)
 }
 
 func analyzeLastMove(ctx context.Context, game *chess.Game, endpoint string, client *http.Client) (Analysis, error) {
@@ -428,4 +501,3 @@ func evaluateFEN(ctx context.Context, endpoint string, client *http.Client, fen 
 		Mate:       wire.Mate,
 	}, nil
 }
-
