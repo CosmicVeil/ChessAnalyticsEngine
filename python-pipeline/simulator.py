@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
 
     counter = 0
-    while counter < 10000:
+    while counter < 20000:
         curr_game = chess.pgn.read_game(pgn)
 
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         counter+=1
 
     counter = 0
-    while counter < 5000:
+    while counter < 10000:
         curr_game = chess.pgn.read_game(pgn2)
 
 
