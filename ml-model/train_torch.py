@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from model_artifacts import build_pytorch_model, model_artifact_path, save_feature_schema
 from training_data import group_train_test_indices, prepare_game_training_data
 import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.metrics import confusion_matrix
 
 def main() -> None:
 
@@ -20,16 +22,25 @@ def main() -> None:
     game_ids = pd.Series(features.index, index=features.index, dtype="string")
     train_index, test_index = group_train_test_indices(features, labels, game_ids)
 
+
     X = torch.tensor(features.values, dtype=torch.float32)
+    X = F.normalize(X, p=2.0, dim=1)
     y = torch.tensor(labels.values, dtype=torch.float32).reshape(-1, 1)
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
     dataloader = DataLoader(list(zip(X_train, y_train)), shuffle=True, batch_size=64)
 
     model = build_pytorch_model(X_train.shape[1]).to(device)
+    label_counts = labels.value_counts().sort_index()
 
-    n_epochs = 1000
-    loss_fn = nn.BCELoss()
+    n_epochs = 200
+
+    num_negatives = label_counts.get(0.0,0)
+    num_positives = label_counts.get(1.0,0)
+
+    pos_weight = torch.tensor([num_negatives / num_positives], dtype=torch.float)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
+
     optimizer = optim.SGD(model.parameters(), lr=0.01)
     model.train()
     print("Starting PyTorch model training...")
@@ -54,7 +65,7 @@ def main() -> None:
 
     model.eval()
     with torch.no_grad():
-        y_pred = model(X_test.to(device))
+        y_pred = torch.sigmoid(model(X_test.to(device)))
     accuracy = float((y_pred.round() == y_test.to(device)).float().mean())
     print("PyTorch model accuracy: %.2f%%" % (accuracy * 100))
 
@@ -63,7 +74,14 @@ def main() -> None:
     pytorch_path = model_artifact_path("pytorch_model.pt")
     # Save the PyTorch weights and input size for the live inference consumer.
     torch.save({"state_dict": model_cpu.state_dict(), "input_size": X_train.shape[1]}, pytorch_path)
+
+    tn, fp, fn, tp = confusion_matrix(y_test.squeeze().to("cpu"), y_pred.squeeze().round().to("cpu")).ravel()
+
+    false_positive_rate = fp / (fp + tn) if fp + tn else 0.0
+
     print(f"Saved PyTorch model to {pytorch_path}")
+
+    print(f"False Positive rate: {false_positive_rate}")
 
 
 if __name__ == "__main__":
