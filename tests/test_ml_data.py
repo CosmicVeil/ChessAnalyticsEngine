@@ -8,6 +8,7 @@ import warnings
 from unittest.mock import patch
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 
@@ -23,6 +24,50 @@ def load_module(module_name, relative_path):
 
 
 class TrainingDataTests(unittest.TestCase):
+    def test_xgboost_preprocessing_fits_min_and_range_on_training_rows_only(self):
+        preprocessing = load_module(
+            "model_preprocessing", "ml-model/model_preprocessing.py"
+        )
+        features = np.array(
+            [[0.0, 5.0], [10.0, 5.0], [100.0, 50.0]], dtype="float32"
+        )
+
+        X_train, X_test, minimum, safe_range = preprocessing.prepare_min_max_splits(
+            features,
+            np.array([0, 1]),
+            np.array([2]),
+        )
+
+        np.testing.assert_allclose(minimum, [0.0, 5.0])
+        np.testing.assert_allclose(safe_range, [10.0, 1.0])
+        np.testing.assert_allclose(X_train, [[0.0, 0.0], [1.0, 0.0]])
+        np.testing.assert_allclose(X_test, [[10.0, 45.0]])
+
+    def test_xgboost_preprocessing_sidecar_preserves_schema_and_parameters(self):
+        preprocessing = load_module(
+            "model_preprocessing", "ml-model/model_preprocessing.py"
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            model_directory = Path(temporary_directory)
+            saved_path = preprocessing.save_xgboost_preprocessing(
+                ["move_count", "rating_diff_mean"],
+                np.array([1.0, -20.0], dtype="float32"),
+                np.array([9.0, 40.0], dtype="float32"),
+                model_directory,
+            )
+            artifact = preprocessing.load_xgboost_preprocessing(model_directory)
+
+        self.assertEqual(saved_path.name, "xgboost_preprocessing.json")
+        self.assertEqual(artifact["version"], 1)
+        self.assertEqual(artifact["transform"], "min_max")
+        self.assertEqual(
+            artifact["feature_names"], ["move_count", "rating_diff_mean"]
+        )
+        self.assertEqual(artifact["minimum"], [1.0, -20.0])
+        self.assertEqual(artifact["range"], [9.0, 40.0])
+        self.assertEqual(len(artifact["feature_schema_sha256"]), 64)
+
     def test_launcher_runs_each_selected_model_in_a_separate_process(self):
         sys.path.insert(0, str(REPOSITORY_ROOT / "ml-model"))
         previous_directory = Path.cwd()
