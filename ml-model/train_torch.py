@@ -6,6 +6,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from model_artifacts import build_pytorch_model, model_artifact_path, save_feature_schema
+from model_preprocessing import feature_schema_fingerprint
 from training_data import group_train_test_indices, prepare_game_training_data
 import torch.nn as nn
 import torch.nn.functional as F
@@ -73,7 +74,17 @@ def main() -> None:
     model_cpu = model.to("cpu")
     pytorch_path = model_artifact_path("pytorch_model.pt")
     # Save the PyTorch weights and input size for the live inference consumer.
-    torch.save({"state_dict": model_cpu.state_dict(), "input_size": X_train.shape[1]}, pytorch_path)
+    torch.save(
+        {
+            "state_dict": model_cpu.state_dict(),
+            "input_size": X_train.shape[1],
+            "preprocessing": "l2",
+            "feature_schema_sha256": feature_schema_fingerprint(
+                features.columns.tolist()
+            ),
+        },
+        pytorch_path,
+    )
 
     tn, fp, fn, tp = confusion_matrix(y_test.squeeze().to("cpu"), y_pred.squeeze().round().to("cpu")).ravel()
 
