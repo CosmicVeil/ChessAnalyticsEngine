@@ -14,9 +14,10 @@ if str(PIPELINE_DIRECTORY) not in sys.path:
 
 from prediction_reporting import PredictionReporter
 from kafka_delivery import commit_after_processing, publish_and_commit
+from kafka_config import get_kafka_bootstrap_servers
 
 
-BOOTSTRAP_SERVERS = "localhost:19092"
+BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 
 

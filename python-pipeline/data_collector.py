@@ -4,8 +4,16 @@ import sys
 from confluent_kafka import Consumer, KafkaException, KafkaError
 from pathlib import Path
 
+PIPELINE_DIRECTORY = Path(__file__).resolve().parent
+if str(PIPELINE_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIRECTORY))
+
 from csv_dataset import append_labeled_record, reset_labeled_dataset, should_store_feature_event
 from kafka_delivery import commit_after_processing
+from kafka_config import get_kafka_bootstrap_servers
+
+
+BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 folder_path = Path(os.path.dirname(os.getcwd()) + '/ml-model/')
 file_path = "chess_dataset.csv"
@@ -15,7 +23,7 @@ full_path = folder_path / file_path
 def create_consumer():
 
     config = {
-        'bootstrap.servers': 'localhost:19092',
+        'bootstrap.servers': BOOTSTRAP_SERVERS,
         'group.id': 'chess-features-consumer',
         'auto.offset.reset': 'earliest',
         'enable.auto.commit': False,

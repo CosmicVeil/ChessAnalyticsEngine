@@ -18,9 +18,10 @@ if str(MODEL_DIRECTORY) not in sys.path:
 from model_artifacts import load_feature_schema
 from live_scoring import GameFeatureCollector
 from kafka_delivery import commit_after_processing, publish_and_commit
+from kafka_config import get_kafka_bootstrap_servers
 
 
-BOOTSTRAP_SERVERS = "localhost:19092"
+BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 
 def main() -> None:

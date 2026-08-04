@@ -9,15 +9,20 @@ import pandas as pd
 import torch
 
 
+PIPELINE_DIRECTORY = Path(__file__).resolve().parent
+if str(PIPELINE_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIRECTORY))
+
 MODEL_DIRECTORY = Path(__file__).resolve().parents[1] / "ml-model"
 if str(MODEL_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(MODEL_DIRECTORY))
 
 from model_artifacts import MODELS_DIRECTORY, build_pytorch_model, load_feature_schema
 from kafka_delivery import publish_and_commit
+from kafka_config import get_kafka_bootstrap_servers
 
 
-BOOTSTRAP_SERVERS = "localhost:19092"
+BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 
 def load_model():
