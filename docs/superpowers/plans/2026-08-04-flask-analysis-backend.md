@@ -69,8 +69,8 @@ The games endpoint accepts `status=all|queued|analyzing|completed|failed`, `agre
 - Create: `webapp/config.py`
 - Create: `webapp/database.py`
 - Create: `webapp/domain.py`
-- Create: `tests/webapp/__init__.py`
-- Create: `tests/webapp/test_config.py`
+- Create: `tests/web_app/__init__.py`
+- Create: `tests/web_app/test_config.py`
 
 **Interfaces:**
 - Produces: immutable `Settings.from_env(environ=None) -> Settings`.
@@ -94,7 +94,7 @@ def test_settings_parse_limits_and_brokers(self):
 
 Add cases for non-positive or non-integer limits. Build an app with injected fakes, then assert `torch` and `xgboost` remain absent from `sys.modules`.
 
-- [ ] **Step 2: Run `tests.webapp.test_config` and verify RED**
+- [ ] **Step 2: Run `tests.web_app.test_config` and verify RED**
 
 - [ ] **Step 3: Add dependencies with `uv`**
 
@@ -134,7 +134,7 @@ Commit with `feat: scaffold Flask analysis adapter`.
 - Create: `webapp/migrations/env.py`
 - Create: `webapp/migrations/script.py.mako`
 - Create: `webapp/migrations/versions/20260804_0001_analysis_adapter.py`
-- Create: `tests/webapp/test_migrations_postgres.py`
+- Create: `tests/web_app/test_migrations_postgres.py`
 
 **Interfaces:**
 - Produces ORM models: `AnalysisJob`, `AnalysisGame`, `AnalysisResult`, `JobEvent`, `UnmatchedResult`.
@@ -182,9 +182,9 @@ Commit with `feat: add analysis job database schema`.
 
 **Files:**
 - Create: `webapp/repository.py`
-- Create: `tests/webapp/fakes.py`
-- Create: `tests/webapp/test_repository_unit.py`
-- Create: `tests/webapp/test_repository_postgres.py`
+- Create: `tests/web_app/fakes.py`
+- Create: `tests/web_app/test_repository_unit.py`
+- Create: `tests/web_app/test_repository_postgres.py`
 
 **Interfaces:**
 - Produces protocol `AnalysisStore` in `webapp/domain.py`.
@@ -231,8 +231,8 @@ Commit with `feat: persist analysis job state transitions`.
 - Create: `webapp/pgn.py`
 - Create: `tests/fixtures/webapp/small_batch.pgn`
 - Create: `tests/fixtures/webapp/malformed_then_valid.pgn`
-- Create: `tests/webapp/test_spool.py`
-- Create: `tests/webapp/test_pgn.py`
+- Create: `tests/web_app/test_spool.py`
+- Create: `tests/web_app/test_pgn.py`
 
 **Interfaces:**
 - Produces: `SpoolService.spool_file(stream, source_name) -> SpooledSource`.
@@ -283,9 +283,9 @@ Commit with `feat: parse and spool PGN analysis batches`.
 - Create: `webapp/kafka.py`
 - Create: `webapp/ingestion_worker.py`
 - Create: `webapp/result_worker.py`
-- Create: `tests/webapp/test_kafka.py`
-- Create: `tests/webapp/test_ingestion_worker.py`
-- Create: `tests/webapp/test_result_worker.py`
+- Create: `tests/web_app/test_kafka.py`
+- Create: `tests/web_app/test_ingestion_worker.py`
+- Create: `tests/web_app/test_result_worker.py`
 
 **Interfaces:**
 - Produces protocol `MovePublisher.publish_game(game_id, events) -> None`.
@@ -322,7 +322,7 @@ Commit with `feat: bridge web analysis jobs to Kafka`.
 **Files:**
 - Create: `webapp/api.py`
 - Create: `webapp/services.py`
-- Create: `tests/webapp/test_api.py`
+- Create: `tests/web_app/test_api.py`
 
 **Interfaces:**
 - Produces `POST /api/analyses`.
@@ -352,7 +352,7 @@ Commit with `feat: expose analysis job APIs`.
 
 **Files:**
 - Create: `webapp/sse.py`
-- Create: `tests/webapp/test_sse.py`
+- Create: `tests/web_app/test_sse.py`
 - Modify: `webapp/api.py`
 
 **Interfaces:**
@@ -381,7 +381,7 @@ Commit with `feat: stream durable analysis progress`.
 ### Task 8: Verify the adapter against PostgreSQL
 
 **Files:**
-- Create: `tests/webapp/test_adapter_integration_postgres.py`
+- Create: `tests/web_app/test_adapter_integration_postgres.py`
 - Create: `README.md` if the current branch still lacks it, otherwise modify it.
 
 **Interfaces:**

@@ -36,7 +36,7 @@
 - Create: `webapp/static/css/components.css`
 - Create: `webapp/static/css/pages.css`
 - Create: `webapp/static/css/motion.css`
-- Create: `tests/webapp/test_pages.py`
+- Create: `tests/web_app/test_pages.py`
 - Modify: `webapp/__init__.py`
 
 **Interfaces:**
@@ -47,7 +47,7 @@
 
 For all four pages, assert status 200, one `<main id="main-content">`, one visible `<h1>`, a skip link, active navigation, and page-specific body classes. Assert rendered analysis HTML contains no spool path or raw PGN text.
 
-- [ ] **Step 2: Run `tests.webapp.test_pages` and confirm missing routes/templates**
+- [ ] **Step 2: Run `tests.web_app.test_pages` and confirm missing routes/templates**
 
 - [ ] **Step 3: Implement page blueprint and shared shell**
 
@@ -87,7 +87,7 @@ Commit with `feat: add editorial Flask page shell`.
 - Create: `webapp/static/images/pieces/knight-vermilion.png`
 - Create: `webapp/static/images/pieces/rook-ink.png`
 - Create: `webapp/static/images/pieces/pawn-acid.png`
-- Create: `tests/webapp/test_visual_assets.py`
+- Create: `tests/web_app/test_visual_assets.py`
 
 **Interfaces:**
 - Each asset is an RGBA PNG at least 1200 by 1200 pixels with transparent corners.
@@ -118,7 +118,7 @@ Commit with `feat: add isolated chess motion assets`.
 - Modify: `webapp/templates/pages/system.html`
 - Modify: `webapp/static/css/pages.css`
 - Modify: `webapp/static/css/components.css`
-- Modify: `tests/webapp/test_pages.py`
+- Modify: `tests/web_app/test_pages.py`
 
 **Interfaces:**
 - Landing primary CTA points to `/analyze`; secondary CTA points to `/system`.
@@ -148,7 +148,7 @@ Commit with `feat: tell the streaming analysis story`.
 - Create: `webapp/static/js/analyze.mjs`
 - Modify: `webapp/static/css/pages.css`
 - Modify: `webapp/static/css/components.css`
-- Modify: `tests/webapp/test_pages.py`
+- Modify: `tests/web_app/test_pages.py`
 
 **Interfaces:**
 - Submits multipart fields `pgn_file`, `pgn_text`, or `lichess_url` to `POST /api/analyses`.
@@ -183,7 +183,7 @@ Commit with `feat: add PGN upload and paste desk`.
 - Create: `webapp/templates/partials/_game_row.html`
 - Modify: `webapp/static/css/pages.css`
 - Create: `tests/web_js/analysis-state.test.mjs`
-- Modify: `tests/webapp/test_pages.py`
+- Modify: `tests/web_app/test_pages.py`
 
 **Interfaces:**
 - Produces JS functions `reduceAnalysisState`, `matchesFilters`, `upsertGameInSequence`, and `formatModelScore`.
