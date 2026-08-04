@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -43,6 +46,76 @@ func TestCommitProcessedMessageReturnsCommitError(t *testing.T) {
 
 	if err := commitProcessedMessage(context.Background(), committer, kafka.Message{}); !errors.Is(err, wantErr) {
 		t.Fatalf("commitProcessedMessage() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestKafkaBootstrapServers(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		unset bool
+		want  []string
+	}{
+		{
+			name:  "environment variable is absent",
+			unset: true,
+			want:  []string{"localhost:19092"},
+		},
+		{
+			name:  "environment variable is blank",
+			value: "   ",
+			want:  []string{"localhost:19092"},
+		},
+		{
+			name:  "comma-separated brokers preserve order",
+			value: " broker-a:9092, broker-b:9092 ",
+			want:  []string{"broker-a:9092", "broker-b:9092"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("KAFKA_BOOTSTRAP_SERVERS", test.value)
+			if test.unset {
+				if err := os.Unsetenv("KAFKA_BOOTSTRAP_SERVERS"); err != nil {
+					t.Fatalf("Unsetenv() error = %v", err)
+				}
+			}
+
+			if got := kafkaBootstrapServers(); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("kafkaBootstrapServers() = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestShouldCompleteGameHonorsExplicitCompletion(t *testing.T) {
+	var event ChessMoveEvent
+	if err := json.Unmarshal([]byte(`{"game_complete":true}`), &event); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if !shouldCompleteGame(event, chess.NewGame()) {
+		t.Fatal("shouldCompleteGame() = false, want true for explicit completion")
+	}
+}
+
+func TestShouldCompleteGameRecognizesCheckmate(t *testing.T) {
+	game := chess.NewGame()
+	for _, move := range []string{"f3", "e5", "g4", "Qh4#"} {
+		if err := game.PushNotationMove(move, chess.AlgebraicNotation{}, nil); err != nil {
+			t.Fatalf("PushNotationMove(%q) error = %v", move, err)
+		}
+	}
+
+	if !shouldCompleteGame(ChessMoveEvent{}, game) {
+		t.Fatal("shouldCompleteGame() = false, want true for checkmate")
+	}
+}
+
+func TestShouldCompleteGameLeavesOngoingGameOpen(t *testing.T) {
+	if shouldCompleteGame(ChessMoveEvent{}, chess.NewGame()) {
+		t.Fatal("shouldCompleteGame() = true, want false for ongoing game")
 	}
 }
 

@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/corentings/chess/v2"
-	"github.com/segmentio/kafka-go"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/corentings/chess/v2"
+	"github.com/segmentio/kafka-go"
 )
 
 const chessAPIURL = "https://chess-api.com/v1"
@@ -20,12 +23,13 @@ const chessAPIURL = "https://chess-api.com/v1"
 var chessAPIClient = &http.Client{Timeout: 5 * time.Second}
 
 type ChessMoveEvent struct {
-	GameID      string  `json:"game_id"`
-	Move        string  `json:"move"`
-	MoveNumber  int     `json:"move_number"`
-	WhiteRating string  `json:"White Rating"`
-	BlackRating string  `json:"Black Rating"`
-	Time        float64 `json:"time"`
+	GameID       string  `json:"game_id"`
+	Move         string  `json:"move"`
+	MoveNumber   int     `json:"move_number"`
+	WhiteRating  string  `json:"White Rating"`
+	BlackRating  string  `json:"Black Rating"`
+	Time         float64 `json:"time"`
+	GameComplete bool    `json:"game_complete,omitempty"`
 }
 
 type FeatureVector struct {
@@ -90,6 +94,29 @@ func commitProcessedMessage(ctx context.Context, committer messageCommitter, mes
 	return committer.CommitMessages(ctx, message)
 }
 
+func kafkaBootstrapServers() []string {
+	value := strings.TrimSpace(os.Getenv("KAFKA_BOOTSTRAP_SERVERS"))
+	if value == "" {
+		return []string{"localhost:19092"}
+	}
+
+	configured := strings.Split(value, ",")
+	brokers := make([]string, 0, len(configured))
+	for _, broker := range configured {
+		if broker = strings.TrimSpace(broker); broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	if len(brokers) == 0 {
+		return []string{"localhost:19092"}
+	}
+	return brokers
+}
+
+func shouldCompleteGame(event ChessMoveEvent, game *chess.Game) bool {
+	return event.GameComplete || game.Outcome() != chess.NoOutcome
+}
+
 // Set adds or updates an item in the map.
 func (sm *SafeMap) Set(key string, value GameInfo) {
 	sm.mu.Lock()         // Acquire write lock
@@ -115,9 +142,10 @@ func (sm *SafeMap) Delete(key string) {
 var chessGames SafeMap = *NewSafeMap()
 
 func main() {
+	brokers := kafkaBootstrapServers()
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     []string{"localhost:19092"},
+		Brokers:     brokers,
 		Topic:       "chess-moves",
 		GroupID:     "chess-state-managers",
 		MinBytes:    10e3,
@@ -126,7 +154,7 @@ func main() {
 	})
 
 	writer := kafka.Writer{
-		Addr:         kafka.TCP("localhost:19092"),
+		Addr:         kafka.TCP(brokers...),
 		Topic:        "chess-features",
 		Balancer:     &kafka.CRC32Balancer{},
 		BatchSize:    1,
@@ -267,7 +295,9 @@ func main() {
 			return
 		}
 
-		if game.Outcome() != chess.NoOutcome {
+		complete := shouldCompleteGame(event, game)
+
+		if complete {
 			completedGame, err := json.Marshal(FeatureVector{
 				GameID:       event.GameID,
 				GameComplete: true,
@@ -295,7 +325,7 @@ func main() {
 			return
 		}
 
-		if game.Outcome() != chess.NoOutcome {
+		if complete {
 			chessGames.Delete(event.GameID)
 		}
 	}
