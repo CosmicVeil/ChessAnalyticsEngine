@@ -269,7 +269,8 @@ class RepositoryPostgresTests(unittest.TestCase):
         snapshot = self.store.get_job(job.id)
         self.assertIs(inserted, StoreResultOutcome.STORED)
         self.assertIs(replayed, StoreResultOutcome.REPLAYED)
-        self.assertEqual(snapshot.status, "completed")
+        self.assertEqual(snapshot.status, "analyzing")
+        self.assertIsNone(snapshot.completed_at)
         self.assertEqual(snapshot.analyzing_games, 0)
         self.assertEqual(snapshot.completed_games, 1)
         self.assertEqual(event_count_after_insert, event_count_before + 1)
@@ -316,6 +317,7 @@ class RepositoryPostgresTests(unittest.TestCase):
         valid = self.store.upsert_parsed_game(partial_job.id, self.parsed(2))
         self.store.mark_game_published(valid.id)
         self.store.store_joined_result(self.result(valid.pipeline_game_id))
+        self.store.finish_ingestion(partial_job.id, "worker-a")
 
         complete_job = self.store.create_queued_job(self.source("complete.pgn"))
         self.claim(complete_job.id)
@@ -324,6 +326,7 @@ class RepositoryPostgresTests(unittest.TestCase):
         )
         self.store.mark_game_published(complete_game.id)
         self.store.store_joined_result(self.result(complete_game.pipeline_game_id))
+        self.store.finish_ingestion(complete_job.id, "worker-a")
 
         failed = self.store.get_job(failed_job.id)
         partial = self.store.get_job(partial_job.id)
@@ -335,31 +338,33 @@ class RepositoryPostgresTests(unittest.TestCase):
         self.assertIsNotNone(partial.completed_at)
         self.assertIsNotNone(complete.completed_at)
 
-    def test_finish_ingestion_preserves_terminal_state_from_fast_result(self) -> None:
+    def test_finish_ingestion_terminalizes_a_fast_result(self) -> None:
         job = self.store.create_queued_job(self.source())
         self.claim(job.id)
         game = self.store.upsert_parsed_game(job.id, self.parsed(1))
         self.store.mark_game_published(game.id)
         self.store.store_joined_result(self.result(game.pipeline_game_id))
-        terminal = self.store.get_job(job.id)
+        in_flight = self.store.get_job(job.id)
 
         self.store.finish_ingestion(job.id, "worker-a")
 
         finished = self.store.get_job(job.id)
+        self.assertEqual(in_flight.status, "analyzing")
+        self.assertIsNone(in_flight.completed_at)
         self.assertEqual(finished.status, "completed")
-        self.assertEqual(finished.completed_at, terminal.completed_at)
+        self.assertIsNotNone(finished.completed_at)
 
-    def test_later_sequence_reopens_a_job_terminalized_by_fast_result(self) -> None:
+    def test_later_sequence_keeps_a_streaming_job_open_after_fast_result(self) -> None:
         valid_job = self.store.create_queued_job(self.source("valid-late.pgn"))
         self.claim(valid_job.id)
         first = self.store.upsert_parsed_game(valid_job.id, self.parsed(1))
         self.store.mark_game_published(first.id)
         self.store.store_joined_result(self.result(first.pipeline_game_id))
-        self.assertEqual(self.store.get_job(valid_job.id).status, "completed")
+        self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
 
         second = self.store.upsert_parsed_game(valid_job.id, self.parsed(2))
         reopened = self.store.get_job(valid_job.id)
-        self.assertEqual(reopened.status, "parsing")
+        self.assertEqual(reopened.status, "analyzing")
         self.assertIsNone(reopened.completed_at)
         self.assertEqual(
             (
@@ -375,6 +380,8 @@ class RepositoryPostgresTests(unittest.TestCase):
         self.store.mark_game_published(second.id)
         self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
         self.store.store_joined_result(self.result(second.pipeline_game_id))
+        self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
+        self.store.finish_ingestion(valid_job.id, "worker-a")
         completed = self.store.get_job(valid_job.id)
         self.assertEqual(completed.status, "completed")
         self.assertEqual(completed.completed_games, 2)
@@ -386,13 +393,14 @@ class RepositoryPostgresTests(unittest.TestCase):
         only_valid = self.store.upsert_parsed_game(invalid_job.id, self.parsed(1))
         self.store.mark_game_published(only_valid.id)
         self.store.store_joined_result(self.result(only_valid.pipeline_game_id))
+        self.assertEqual(self.store.get_job(invalid_job.id).status, "analyzing")
 
         self.store.record_invalid_game(
             invalid_job.id,
             InvalidGame(2, "invalid_pgn", "late illegal move"),
         )
         reopened_after_invalid = self.store.get_job(invalid_job.id)
-        self.assertEqual(reopened_after_invalid.status, "parsing")
+        self.assertEqual(reopened_after_invalid.status, "analyzing")
         self.assertIsNone(reopened_after_invalid.completed_at)
         self.store.finish_ingestion(invalid_job.id, "worker-a")
         self.assertEqual(self.store.get_job(invalid_job.id).status, "partial")

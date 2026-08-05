@@ -325,7 +325,9 @@ class SqlAlchemyAnalysisStore:
 
             now = datetime.now(UTC)
             if (
-                job.total_games > 0
+                job.spool_path is None
+                and job.claimed_by is None
+                and job.total_games > 0
                 and job.completed_games + job.failed_games == job.total_games
                 and job.queued_games == 0
                 and job.analyzing_games == 0

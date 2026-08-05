@@ -262,7 +262,8 @@ class FakeAnalysisStore:
             updated_at=now,
         )
         if (
-            job.total_games > 0
+            job.id not in self.sources
+            and job.total_games > 0
             and job.completed_games + job.failed_games == job.total_games
             and job.queued_games == 0
             and job.analyzing_games == 0
