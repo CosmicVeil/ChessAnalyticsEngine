@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee7d8">
+  <meta name="description" content="Chess Analytics Engine streams PGN batches through independent PyTorch and XGBoost analysis workers.">
+  <title>{% block title %}Chess Analytics Engine{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-page="{% block page %}base{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('pages.landing') }}" aria-label="Chess Analytics Engine home">
+      <span class="brand-mark">CÆ</span><span class="brand-index">/ 01</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="{{ url_for('pages.analyze') }}">Analyze</a>
+      <a href="{{ url_for('pages.system') }}">System</a>
+      <span class="nav-signal" aria-hidden="true"></span>
+    </nav>
+  </header>
+  <main id="main">{% block content %}{% endblock %}</main>
+  <footer class="site-footer">
+    <p>Model scores are signals, not proof of misconduct.</p>
+    <p class="mono">PYTORCH × XGBOOST / POSTGRESQL EVENT LOG</p>
+  </footer>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Live batch — Chess Analytics Engine{% endblock %}
+{% block page %}analysis{% endblock %}
+{% block content %}
+<div class="live-page" data-job-id="{{ job_id }}">
+  <header class="live-header">
+    <div>
+      <p class="eyebrow">Live analysis / <span data-job-short>{{ job_id|string|truncate(8, True, '') }}</span></p>
+      <h1 data-source-name>Loading batch…</h1>
+    </div>
+    <div class="connection-state" data-connection><i></i><span>Connecting to event log</span></div>
+  </header>
+
+  <section class="count-rail" aria-label="Job progress">
+    <article><span>Total</span><strong data-count-key="total">—</strong></article>
+    <article><span>Queued</span><strong data-count-key="queued">—</strong></article>
+    <article><span>Analyzing</span><strong data-count-key="analyzing">—</strong></article>
+    <article><span>Completed</span><strong data-count-key="completed">—</strong></article>
+    <article><span>Failed</span><strong data-count-key="failed">—</strong></article>
+    <div class="progress-track"><i data-progress></i></div>
+  </section>
+
+  <section class="result-workbench">
+    <div class="result-heading">
+      <div><p class="eyebrow">Source-ordered ledger</p><h2>Game-by-game scores</h2></div>
+      <form class="result-filters" data-filters>
+        <label>Status<select name="status"><option value="all">All states</option><option>queued</option><option>analyzing</option><option>completed</option><option>failed</option></select></label>
+        <label>Agreement<select name="agreement"><option value="all">All models</option><option value="agree">Agree</option><option value="disagree">Disagree</option></select></label>
+        <label>Min score<input name="score_min" type="number" min="0" max="1" step="0.05" placeholder="0.00"></label>
+      </form>
+    </div>
+    <div class="result-columns" aria-hidden="true"><span>Game / players</span><span>PyTorch score</span><span>XGBoost score</span><span>State</span></div>
+    <div class="game-ledger" data-game-ledger aria-live="polite" aria-busy="true"></div>
+    <button class="load-more" type="button" data-load-more hidden>Load next 50 games</button>
+    <p class="empty-ledger" data-empty>Waiting for the parser to register game one.</p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/analysis.js') }}"></script>{% endblock %}
