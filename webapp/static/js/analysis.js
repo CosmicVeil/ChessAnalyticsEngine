@@ -1,3 +1,25 @@
+export function jobConnectionState(status) {
+  const normalized = status === "analyzing" ? "live" : status;
+  if (normalized === "parsing") {
+    return { label: "Reading PGN", terminal: false, failed: false };
+  }
+  if (normalized === "live") {
+    return { label: "Live analysis", terminal: false, failed: false };
+  }
+  if (["completed", "partial", "failed"].includes(normalized)) {
+    return {
+      label: `Batch ${normalized}`,
+      terminal: true,
+      failed: normalized === "failed",
+    };
+  }
+  return {
+    label: "Waiting for ingestion",
+    terminal: false,
+    failed: false,
+  };
+}
+
 const root = document.querySelector("[data-job-id]");
 if (root) {
   const jobId = root.dataset.jobId;
@@ -8,8 +30,18 @@ if (root) {
   const loadMore = document.querySelector("[data-load-more]");
   const cards = new Map();
   let nextCursor = null;
+  let eventSource;
+  let latestJobStatus = "queued";
+
+  function renderJobConnection(status = latestJobStatus) {
+    const state = jobConnectionState(status);
+    connection.classList.toggle("is-offline", state.failed);
+    connection.querySelector("span").textContent = state.label;
+    return state;
+  }
 
   function updateJob(job) {
+    latestJobStatus = job.status;
     document.querySelector("[data-source-name]").textContent = job.source_name;
     for (const [key, value] of Object.entries(job.counts)) {
       const target = document.querySelector(`[data-count-key="${key}"]`);
@@ -17,9 +49,8 @@ if (root) {
     }
     const terminal = job.counts.completed + job.counts.failed;
     document.querySelector("[data-progress]").style.transform = `scaleX(${job.counts.total ? terminal / job.counts.total : 0})`;
-    if (["completed", "partial", "failed"].includes(job.status)) {
-      connection.querySelector("span").textContent = `Batch ${job.status}`;
-      connection.classList.toggle("is-offline", job.status === "failed");
+    const connectionState = renderJobConnection();
+    if (connectionState.terminal) {
       eventSource?.close();
     }
   }
@@ -73,11 +104,18 @@ if (root) {
   filters.addEventListener("input", () => cards.forEach(applyVisibility));
   loadMore.addEventListener("click", () => loadGames());
 
-  let eventSource;
   Promise.all([loadStatus(), loadGames(true)]).then(() => {
+    if (renderJobConnection().terminal) return;
     eventSource = new EventSource(`/api/analyses/${jobId}/events`);
-    eventSource.addEventListener("open", () => { connection.classList.remove("is-offline"); connection.querySelector("span").textContent = "Event log connected"; });
-    eventSource.addEventListener("error", () => { connection.classList.add("is-offline"); connection.querySelector("span").textContent = "Reconnecting to event log"; });
+    eventSource.addEventListener("open", () => renderJobConnection());
+    eventSource.addEventListener("error", () => {
+      if (jobConnectionState(latestJobStatus).terminal) {
+        renderJobConnection();
+        return;
+      }
+      connection.classList.add("is-offline");
+      connection.querySelector("span").textContent = "Reconnecting to live analysis";
+    });
     eventSource.addEventListener("job.updated", (event) => updateJob(JSON.parse(event.data).job));
     eventSource.addEventListener("game.updated", (event) => {
       const payload = JSON.parse(event.data);

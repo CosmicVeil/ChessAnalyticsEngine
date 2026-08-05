@@ -65,6 +65,12 @@ class FrontendPageTests(unittest.TestCase):
         self.assertNotIn(b"PyTorch score</span>", response.data)
         self.assertNotIn(b"XGBoost score</span>", response.data)
 
+    def test_live_ledger_connects_with_live_analysis_copy(self):
+        response = self.client.get(f"/analyses/{uuid.uuid4()}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Connecting to live analysis", response.data)
+
 
 if __name__ == "__main__":
     unittest.main()

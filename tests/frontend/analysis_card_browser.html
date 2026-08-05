@@ -3,14 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="../../webapp/static/css/site.css?browser-test=3">
+    <link rel="stylesheet" href="../../webapp/static/css/site.css?browser-test=5">
     <title>Analysis card browser test</title>
   </head>
   <body>
     <main id="fixture"></main>
     <pre id="report"></pre>
     <script type="module">
-      import { buildCard } from "../../webapp/static/js/analysis.js?browser-test=3";
+      import {
+        buildCard,
+        jobConnectionState,
+      } from "../../webapp/static/js/analysis.js?browser-test=5";
 
       const game = {
         id: "game-1",
@@ -30,6 +33,11 @@
       };
       const failures = [];
       const check = (condition, message) => { if (!condition) failures.push(message); };
+      check(jobConnectionState("parsing").label === "Reading PGN", "parsing copy missing");
+      check(jobConnectionState("live").label === "Live analysis", "live copy missing");
+      check(jobConnectionState("analyzing").label === "Live analysis", "legacy copy missing");
+      check(!jobConnectionState("live").terminal, "live state closes SSE");
+      check(jobConnectionState("completed").terminal, "completed state stays open");
       const fixture = document.querySelector("#fixture");
       const card = buildCard(game);
       fixture.append(card);
