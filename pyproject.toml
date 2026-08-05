@@ -4,10 +4,15 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
+    "alembic>=1.16.5",
+    "chess>=1.11.2",
     "confluent-kafka>=2.13.0",
+    "flask>=3.1.2",
     "pandas>=3.0.3",
     "pandas-stubs~=3.0.3",
+    "psycopg[binary]>=3.2.9",
     "scikit-learn>=1.9.0",
+    "sqlalchemy>=2.0.43",
     "torch>=2.13.0",
     "xgboost>=3.3.0",
 ]
