@@ -32,7 +32,7 @@ class SnapshotViewTests(unittest.TestCase):
             id=self.job_id,
             source_type="file",
             source_name="round-one.pgn",
-            status="analyzing",
+            status="live",
             total_games=4,
             queued_games=1,
             analyzing_games=1,
@@ -49,7 +49,7 @@ class SnapshotViewTests(unittest.TestCase):
                 "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "source_type": "file",
                 "source_name": "round-one.pgn",
-                "status": "analyzing",
+                "status": "live",
                 "counts": {
                     "total": 4,
                     "queued": 1,
@@ -153,6 +153,33 @@ class QueryContractTests(unittest.TestCase):
 
 
 class FakeStoreContractTests(unittest.TestCase):
+    def test_job_status_contract_uses_live_while_game_status_keeps_analyzing(
+        self,
+    ) -> None:
+        from webapp.models import (
+            GAME_STATUSES,
+            JOB_STATUSES,
+            JOB_STATUS_LIVE,
+        )
+
+        self.assertEqual(JOB_STATUS_LIVE, "live")
+        self.assertEqual(
+            JOB_STATUSES,
+            (
+                "received",
+                "queued",
+                "parsing",
+                "live",
+                "completed",
+                "partial",
+                "failed",
+            ),
+        )
+        self.assertEqual(
+            GAME_STATUSES,
+            ("queued", "analyzing", "completed", "failed"),
+        )
+
     def test_fake_supports_protocol_job_claim_and_event_flow(self) -> None:
         store = FakeAnalysisStore()
         source = SpooledSource("file", "batch.pgn", Path("/spool/batch"))

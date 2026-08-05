@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import unittest
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,8 @@ class MigrationPostgresTests(unittest.TestCase):
             "analyzing_games": 0,
             "completed_games": 0,
             "failed_games": 0,
+            "claimed_by": None,
+            "lease_expires_at": None,
             "attempt_count": 0,
         }
         values.update(overrides)
@@ -90,6 +93,8 @@ class MigrationPostgresTests(unittest.TestCase):
                 analyzing_games,
                 completed_games,
                 failed_games,
+                claimed_by,
+                lease_expires_at,
                 attempt_count
             ) VALUES (
                 :id,
@@ -101,6 +106,8 @@ class MigrationPostgresTests(unittest.TestCase):
                 :analyzing_games,
                 :completed_games,
                 :failed_games,
+                :claimed_by,
+                :lease_expires_at,
                 :attempt_count
             )
         """), values)
@@ -366,7 +373,7 @@ class MigrationPostgresTests(unittest.TestCase):
                 "received",
                 "queued",
                 "parsing",
-                "analyzing",
+                "live",
                 "completed",
                 "partial",
                 "failed",
@@ -400,6 +407,62 @@ class MigrationPostgresTests(unittest.TestCase):
         }
         self.assertIn("ck_analysis_jobs_status", job_checks)
         self.assertIn("ck_analysis_games_status", game_checks)
+
+    def test_upgrade_converts_active_analyzing_jobs_without_losing_state(
+        self,
+    ) -> None:
+        job_id = uuid.uuid4()
+        lease_expires_at = datetime(2026, 8, 5, 18, 30, tzinfo=UTC)
+
+        try:
+            command.downgrade(self.alembic_config, "20260804_0001")
+            with self.engine.begin() as connection:
+                self._insert_job(
+                    connection,
+                    job_id=job_id,
+                    status="analyzing",
+                    total_games=17,
+                    queued_games=8,
+                    analyzing_games=3,
+                    completed_games=5,
+                    failed_games=1,
+                    claimed_by="ingestor-a",
+                    lease_expires_at=lease_expires_at,
+                    attempt_count=2,
+                )
+
+            command.upgrade(self.alembic_config, "head")
+
+            with self.engine.connect() as connection:
+                row = connection.execute(
+                    sa.text("""
+                        SELECT
+                            status,
+                            total_games,
+                            queued_games,
+                            analyzing_games,
+                            completed_games,
+                            failed_games,
+                            claimed_by,
+                            lease_expires_at,
+                            attempt_count
+                        FROM analysis_jobs
+                        WHERE id = :job_id
+                    """),
+                    {"job_id": job_id},
+                ).mappings().one()
+
+            self.assertEqual(row["status"], "live")
+            self.assertEqual(row["total_games"], 17)
+            self.assertEqual(row["queued_games"], 8)
+            self.assertEqual(row["analyzing_games"], 3)
+            self.assertEqual(row["completed_games"], 5)
+            self.assertEqual(row["failed_games"], 1)
+            self.assertEqual(row["claimed_by"], "ingestor-a")
+            self.assertEqual(row["lease_expires_at"], lease_expires_at)
+            self.assertEqual(row["attempt_count"], 2)
+        finally:
+            command.upgrade(self.alembic_config, "head")
 
     def test_downgrade_and_reupgrade_restore_the_schema(self) -> None:
         try:
