@@ -99,6 +99,7 @@ The topic topology and process isolation remain intact. Changes to the existing 
 3. XGBoost training now fits min/max metadata on training rows and writes a validated preprocessing sidecar. Its live worker loads that sidecar before scoring.
 4. PyTorch live inference now repeats training-time L2 normalization, validates checkpoint metadata, and converts the logit with sigmoid.
 5. The new Flask process and its two web workers sit outside the core. They use existing `chess-moves` and `chess-predictions` topics; no core topic was renamed and the two model libraries remain in separate processes.
+6. `live_pipeline.py` is an additive supervisor for the four existing Python core workers. It imports no model or Flask code, and it stops the remaining workers if one exits so a partially running pipeline is visible immediately.
 
 The web layer also adds PostgreSQL, Alembic migrations, private PGN spooling, durable job events, and idempotent result storage. These additions adapt the pipeline for browser workloads without moving feature extraction or inference into Flask.
 
@@ -119,14 +120,20 @@ export KAFKA_BOOTSTRAP_SERVERS=localhost:19092
 .venv/bin/alembic upgrade head
 ```
 
-Run each long-lived component in its own terminal.
-
-Core pipeline:
+Run the Go processor in its own terminal:
 
 ```bash
 cd go-backend
 go run .
 ```
+
+Start all four Python core workers together from the repository root:
+
+```bash
+.venv/bin/python python-pipeline/live_pipeline.py
+```
+
+For debugging, stop the supervisor and start the same workers individually:
 
 ```bash
 .venv/bin/python python-pipeline/live_game_collector.py
@@ -135,7 +142,7 @@ go run .
 .venv/bin/python python-pipeline/prediction_reporter.py
 ```
 
-Web adapter:
+Keep Flask and both web adapter workers separate from the core launcher, with each command in its own terminal:
 
 ```bash
 .venv/bin/flask --app webapp run --port 5000
