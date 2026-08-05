@@ -29,12 +29,12 @@ def main() -> None:
     y = torch.tensor(labels.values, dtype=torch.float32).reshape(-1, 1)
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
-    dataloader = DataLoader(list(zip(X_train, y_train)), shuffle=True, batch_size=64)
+    dataloader = DataLoader(list(zip(X_train, y_train)), shuffle=True, batch_size=128)
 
     model = build_pytorch_model(X_train.shape[1]).to(device)
     label_counts = labels.value_counts().sort_index()
 
-    n_epochs = 200
+    n_epochs = 300
 
     num_negatives = label_counts.get(0.0,0)
     num_positives = label_counts.get(1.0,0)
