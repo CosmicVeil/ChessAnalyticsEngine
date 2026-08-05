@@ -6,7 +6,7 @@ Make every completed game readable before expansion and make its disclosure cont
 
 ## Root cause
 
-The current button toggles the detail element's `hidden` attribute. The author rule `.game-detail { display: flex; }` overrides the browser's default `[hidden] { display: none; }`, so the button updates its state without changing what the user sees.
+The original button toggled the detail element's `hidden` attribute. The author rule `.game-detail { display: flex; }` overrode the browser's default `[hidden] { display: none; }`, so the button updated its state without changing what the user saw.
 
 ## Result-card presentation
 
@@ -17,7 +17,7 @@ Each game keeps four source-ordered columns:
 3. XGBoost verdict.
 4. Analysis state.
 
-A completed model cell reads `Says cheating` when its stored prediction is true and `Doesn't say cheating` when false. A pending model reads `Waiting`. The column headings use `PyTorch verdict` and `XGBoost verdict`.
+A completed model cell reads `Says cheating` when its stored prediction is true and `No cheating signal` when false. A pending model reads `Waiting`. The column headings use `PyTorch verdict` and `XGBoost verdict`.
 
 The wording attributes the decision to the model. It does not label either player as a cheater.
 
@@ -35,9 +35,11 @@ For each completed model, details show:
 
 - the model score formatted as a percentage;
 - whether the score is above or below the 50% decision threshold;
-- the resulting `says cheating` or `doesn't say cheating` decision.
+- the resulting `says cheating` or `no cheating signal` decision.
 
 The detail closes with model agreement or disagreement and this interpretation: the percentages are uncalibrated model scores, not measured accuracy, proof, or a calibrated probability that cheating occurred.
+
+For a false prediction, the threshold explanation ends with `The model produced no cheating signal.` This keeps the expanded wording consistent with the collapsed verdict.
 
 ## Filtering
 
@@ -57,3 +59,7 @@ Automated browser-side behavior tests will render a card with one positive and o
 - pending and failed cards remain understandable.
 
 The existing page, JavaScript syntax, Python, and Go suites must remain green. A browser pass will verify pointer interaction, keyboard activation, responsive layout, and console output.
+
+## Delivery
+
+After the copy test and full regression suite pass, merge the complete `feature/more-features` history into local `main`. Preserve the user's unstaged `ml-model/train_torch.py` changes throughout the merge and leave them unstaged on `main`.
