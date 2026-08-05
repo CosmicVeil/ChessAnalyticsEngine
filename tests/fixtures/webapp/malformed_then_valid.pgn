@@ -1,0 +1,22 @@
+[Event "Malformed"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "1"]
+[White "Broken"]
+[Black "Game"]
+[Result "*"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Qxa1 *
+
+[Event "Recovered"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "2"]
+[White "Valid"]
+[Black "Later"]
+[WhiteElo "1600"]
+[BlackElo "1550"]
+[Result "1/2-1/2"]
+[Termination "agreement"]
+
+1. c4 e5 2. Nc3 Nf6 1/2-1/2

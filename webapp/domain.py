@@ -35,6 +35,7 @@ class ParsedGame:
     result: str | None = None
     played_at: datetime | None = None
     opening: str | None = None
+    game: Any = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,0 +1,48 @@
+[Event "Checkmate"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "1"]
+[White "Ada"]
+[Black "Grace"]
+[WhiteElo "1500"]
+[BlackElo "1450"]
+[Result "0-1"]
+[Opening "Fool's Mate"]
+[Termination "checkmate"]
+
+1. f3 {[%clk 0:10:00]} e5 {[%clk 0:10:00]} 2. g4 {[%clk 0:09:58]} Qh4# {[%clk 0:09:57]} 0-1
+
+[Event "Resignation"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "2"]
+[White "Missing Rating"]
+[Black "Invalid Rating"]
+[WhiteElo "?"]
+[Result "1-0"]
+[Termination "resignation"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0
+
+[Event "Agreed Draw"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "3"]
+[White "Katherine"]
+[Black "Dorothy"]
+[WhiteElo "1800"]
+[BlackElo "1800"]
+[Result "1/2-1/2"]
+[Termination "agreement"]
+
+1. d4 {[%clk 0:05:00]} d5 2. c4 e6 1/2-1/2
+
+[Event "Empty Mainline"]
+[Site "Toronto"]
+[Date "2026.08.04"]
+[Round "4"]
+[White "Empty"]
+[Black "Game"]
+[Result "*"]
+
+*
