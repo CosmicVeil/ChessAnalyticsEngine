@@ -158,7 +158,7 @@ function playerLine(player) {
 function verdictCell(kind, modelName, score) {
   const cell = element("div", `model-verdict ${kind}`);
   const verdict = score
-    ? (score.prediction ? "Says cheating" : "Doesn't say cheating")
+    ? (score.prediction ? "Says cheating" : "No cheating signal")
     : "Waiting";
   cell.setAttribute("aria-label", `${modelName}: ${verdict}`);
   cell.append(element("strong", score?.prediction ? "positive" : "", verdict));
@@ -175,7 +175,7 @@ function modelDetail(modelName, score) {
       "",
       score.prediction
         ? "This score is at or above the 50% decision threshold. The model says cheating."
-        : "This score is below the 50% decision threshold. The model doesn't say cheating.",
+        : "This score is below the 50% decision threshold. The model produced no cheating signal.",
     ),
   );
   return detail;

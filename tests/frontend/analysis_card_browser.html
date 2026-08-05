@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="../../webapp/static/css/site.css?browser-test=1">
+    <link rel="stylesheet" href="../../webapp/static/css/site.css?browser-test=3">
     <title>Analysis card browser test</title>
   </head>
   <body>
     <main id="fixture"></main>
     <pre id="report"></pre>
     <script type="module">
-      import { buildCard } from "../../webapp/static/js/analysis.js?browser-test=1";
+      import { buildCard } from "../../webapp/static/js/analysis.js?browser-test=3";
 
       const game = {
         id: "game-1",
@@ -35,7 +35,7 @@
       fixture.append(card);
 
       check(card.querySelector(".model-verdict.pytorch")?.textContent === "Says cheating", "positive verdict missing");
-      check(card.querySelector(".model-verdict.xgb")?.textContent === "Doesn't say cheating", "negative verdict missing");
+      check(card.querySelector(".model-verdict.xgb")?.textContent === "No cheating signal", "negative verdict missing");
       check(!card.querySelector(".model-verdict")?.textContent.includes("%"), "collapsed row exposes percentages");
       const disclosure = card.querySelector("details.game-detail");
       check(Boolean(disclosure), "native disclosure missing");
@@ -60,6 +60,11 @@
       check(updated.querySelector("details.game-detail")?.open, "SSE rebuild lost open state");
       check(updated.textContent.includes("50% decision threshold"), "threshold meaning missing");
       check(updated.textContent.includes("uncalibrated model scores"), "score caveat missing");
+      check(
+        updated.textContent.includes("The model produced no cheating signal."),
+        "negative threshold explanation missing",
+      );
+      check(!updated.textContent.includes("Doesn't say cheating"), "old negative copy remains");
 
       document.querySelector("#report").textContent = failures.join("\n") || "PASS";
       document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";
