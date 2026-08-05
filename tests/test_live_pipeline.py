@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
+import signal
 import subprocess
+import sys
+import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -23,6 +28,43 @@ LIVE_PIPELINE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(LIVE_PIPELINE)
 run_pipeline = LIVE_PIPELINE.run_pipeline
 worker_commands = LIVE_PIPELINE.worker_commands
+
+
+WORKER_CODE = (
+    "import os, pathlib, sys, time; "
+    "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8'); "
+    "time.sleep(60)"
+)
+SUPERVISOR_CODE = "\n".join(
+    (
+        "import importlib.util, pathlib, sys",
+        "module_path = pathlib.Path(sys.argv[1])",
+        "worker_code = sys.argv[2]",
+        "spec = importlib.util.spec_from_file_location('live_pipeline_child', module_path)",
+        "module = importlib.util.module_from_spec(spec)",
+        "spec.loader.exec_module(module)",
+        "commands = tuple((sys.executable, '-c', worker_code, marker) for marker in sys.argv[3:])",
+        "module.worker_commands = lambda: commands",
+        "raise SystemExit(module.run_pipeline())",
+    )
+)
+
+
+def _process_is_running(process_id: int) -> bool:
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _wait_until(predicate, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
 
 
 class FakeProcess:
@@ -149,6 +191,60 @@ class LivePipelineTests(unittest.TestCase):
         for child in children:
             self.assertTrue(child.terminated)
             self.assertEqual(child.wait_calls, [5])
+
+    def test_sigterm_stops_real_worker_processes_before_supervisor_exits(
+        self,
+    ) -> None:
+        worker_process_ids: list[int] = []
+        with tempfile.TemporaryDirectory() as directory:
+            marker_paths = [
+                Path(directory) / f"worker-{index}.pid"
+                for index in range(4)
+            ]
+            supervisor = subprocess.Popen(
+                (
+                    sys.executable,
+                    "-c",
+                    SUPERVISOR_CODE,
+                    str(MODULE_PATH),
+                    WORKER_CODE,
+                    *(str(path) for path in marker_paths),
+                ),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            try:
+                self.assertTrue(
+                    _wait_until(
+                        lambda: all(path.exists() for path in marker_paths)
+                    ),
+                    "the supervisor did not start all four workers",
+                )
+                worker_process_ids = [
+                    int(path.read_text(encoding="utf-8"))
+                    for path in marker_paths
+                ]
+
+                supervisor.send_signal(signal.SIGTERM)
+                returncode = supervisor.wait(timeout=5)
+
+                self.assertEqual(returncode, 0)
+                self.assertTrue(
+                    _wait_until(
+                        lambda: all(
+                            not _process_is_running(process_id)
+                            for process_id in worker_process_ids
+                        )
+                    ),
+                    "SIGTERM left one or more workers running",
+                )
+            finally:
+                if supervisor.poll() is None:
+                    supervisor.kill()
+                    supervisor.wait()
+                for process_id in worker_process_ids:
+                    if _process_is_running(process_id):
+                        os.kill(process_id, signal.SIGKILL)
 
 
 if __name__ == "__main__":

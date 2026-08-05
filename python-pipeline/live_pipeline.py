@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import signal
 import subprocess
 import sys
 import time
@@ -70,11 +71,23 @@ def run_pipeline(
     """Run all core workers and fail the group if any worker exits."""
 
     children: list[tuple[tuple[str, ...], ChildProcess]] = []
+    shutdown_requested = False
+
+    def request_shutdown(_signal_number: int, _frame: object) -> None:
+        nonlocal shutdown_requested
+        shutdown_requested = True
+
+    previous_sigterm_handler = signal.signal(
+        signal.SIGTERM,
+        request_shutdown,
+    )
     try:
         for command in worker_commands():
+            if shutdown_requested:
+                return 0
             children.append((command, process_factory(command)))
 
-        while True:
+        while not shutdown_requested:
             for command, child in children:
                 returncode = child.poll()
                 if returncode is not None:
@@ -85,10 +98,14 @@ def run_pipeline(
                     )
                     return returncode or 1
             sleep(0.25)
+        return 0
     except KeyboardInterrupt:
         return 0
     finally:
-        _stop_children(children)
+        try:
+            _stop_children(children)
+        finally:
+            signal.signal(signal.SIGTERM, previous_sigterm_handler)
 
 
 if __name__ == "__main__":
