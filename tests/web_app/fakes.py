@@ -72,7 +72,7 @@ class FakeAnalysisStore:
                 job.id, now
             ) <= now
             expired = (
-                job.status in {"parsing", "analyzing"}
+                job.status in {"parsing", "live"}
                 and previous is not None
                 and previous.lease_expires_at <= now
             )
@@ -179,7 +179,7 @@ class FakeAnalysisStore:
         game = replace(game, status="analyzing")
         job = replace(
             job,
-            status="analyzing",
+            status="live",
             queued_games=job.queued_games - 1,
             analyzing_games=job.analyzing_games + 1,
             updated_at=datetime.now(UTC),
@@ -219,7 +219,7 @@ class FakeAnalysisStore:
             status = self._terminal_status(job)
             job = replace(job, status=status, updated_at=now, completed_at=now)
         else:
-            job = replace(job, status="analyzing", updated_at=now)
+            job = replace(job, status="live", updated_at=now)
         self.jobs[job_id] = job
         self._emit_job(job)
 
@@ -274,7 +274,7 @@ class FakeAnalysisStore:
                 completed_at=now,
             )
         elif job.status not in TERMINAL_STATUSES:
-            job = replace(job, status="analyzing")
+            job = replace(job, status="live")
         self.games[game.id] = game
         self.jobs[job.id] = job
         self._emit_game(job, game)

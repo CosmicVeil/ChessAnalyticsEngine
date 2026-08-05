@@ -47,7 +47,7 @@ class IngestionWorkerTests(unittest.TestCase):
             self.assertTrue(all(events[-1]["game_complete"] for _, events in publisher.games))
             snapshot = store.get_job(job.id)
             self.assertEqual((snapshot.total_games, snapshot.analyzing_games, snapshot.failed_games), (4, 3, 1))
-            self.assertEqual(snapshot.status, "analyzing")
+            self.assertEqual(snapshot.status, "live")
             self.assertFalse(path.exists())
 
     def test_publish_failure_schedules_retry_and_retains_spool(self):

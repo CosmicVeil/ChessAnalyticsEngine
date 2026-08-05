@@ -77,6 +77,7 @@ class ImmediateResultPublisher:
     def __init__(self, result_worker: ResultWorker) -> None:
         self.result_worker = result_worker
         self.messages: list[JoinedMessage] = []
+        self.statuses_after_results: list[str] = []
 
     def publish_game(self, game_id: str, events: object) -> None:
         materialized = list(events)
@@ -87,6 +88,11 @@ class ImmediateResultPublisher:
         outcome = self.result_worker.process(message)
         if outcome is not ResultDisposition.STORED:
             raise AssertionError(f"unexpected result disposition: {outcome}")
+        job_id = uuid.UUID(game_id.split(":", 2)[1])
+        job = self.result_worker.store.get_job(job_id)
+        if job is None:
+            raise AssertionError(f"analysis job disappeared: {job_id}")
+        self.statuses_after_results.append(job.status)
 
 
 class AdapterIntegrationPostgresTests(unittest.TestCase):
@@ -172,6 +178,10 @@ class AdapterIntegrationPostgresTests(unittest.TestCase):
             self.assertEqual(
                 [message.payload["game_id"] for message in publisher.messages],
                 [f"web:{job_id}:{sequence}" for sequence in (1, 2, 3)],
+            )
+            self.assertEqual(
+                publisher.statuses_after_results,
+                ["live", "live", "live"],
             )
 
             event_count = len(self.store.events_after(job_id, 0, 1000))

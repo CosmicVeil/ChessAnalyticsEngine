@@ -8,7 +8,12 @@ from pathlib import Path
 from tests.web_app.fakes import FakeAnalysisStore
 from webapp import create_app
 from webapp.config import Settings
-from webapp.domain import JobEventSnapshot, SpooledSource, WebDependencies
+from webapp.domain import (
+    JobEventSnapshot,
+    ParsedGame,
+    SpooledSource,
+    WebDependencies,
+)
 from webapp.sse import format_sse, stream_events
 
 
@@ -39,6 +44,27 @@ class SseTests(unittest.TestCase):
         events = list(stream_events(store, job.id, after_id=1, wait=lambda: None))
         self.assertTrue(events)
         self.assertTrue(all(not event.startswith(b"id: 1\n") for event in events))
+
+    def test_stream_stays_open_while_batch_is_live(self):
+        store = FakeAnalysisStore()
+        job = store.create_queued_job(
+            SpooledSource("paste", "pgn", Path("/tmp/x"))
+        )
+        store.claim_next_job(
+            "w", datetime(2026, 8, 4, tzinfo=UTC), timedelta(minutes=1)
+        )
+        game = store.upsert_parsed_game(job.id, ParsedGame(sequence=1))
+        store.mark_game_published(game.id)
+        self.assertEqual(store.get_job(job.id).status, "live")
+
+        stream = stream_events(
+            store,
+            job.id,
+            after_id=store.events[-1].id,
+            wait=lambda: None,
+        )
+        self.assertEqual(next(stream), b": keepalive\n\n")
+        stream.close()
 
     def test_endpoint_prefers_query_cursor_and_sets_stream_headers(self):
         store = FakeAnalysisStore()

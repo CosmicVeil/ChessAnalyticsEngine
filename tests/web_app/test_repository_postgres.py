@@ -269,7 +269,7 @@ class RepositoryPostgresTests(unittest.TestCase):
         snapshot = self.store.get_job(job.id)
         self.assertIs(inserted, StoreResultOutcome.STORED)
         self.assertIs(replayed, StoreResultOutcome.REPLAYED)
-        self.assertEqual(snapshot.status, "analyzing")
+        self.assertEqual(snapshot.status, "live")
         self.assertIsNone(snapshot.completed_at)
         self.assertEqual(snapshot.analyzing_games, 0)
         self.assertEqual(snapshot.completed_games, 1)
@@ -349,7 +349,7 @@ class RepositoryPostgresTests(unittest.TestCase):
         self.store.finish_ingestion(job.id, "worker-a")
 
         finished = self.store.get_job(job.id)
-        self.assertEqual(in_flight.status, "analyzing")
+        self.assertEqual(in_flight.status, "live")
         self.assertIsNone(in_flight.completed_at)
         self.assertEqual(finished.status, "completed")
         self.assertIsNotNone(finished.completed_at)
@@ -360,11 +360,11 @@ class RepositoryPostgresTests(unittest.TestCase):
         first = self.store.upsert_parsed_game(valid_job.id, self.parsed(1))
         self.store.mark_game_published(first.id)
         self.store.store_joined_result(self.result(first.pipeline_game_id))
-        self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
+        self.assertEqual(self.store.get_job(valid_job.id).status, "live")
 
         second = self.store.upsert_parsed_game(valid_job.id, self.parsed(2))
         reopened = self.store.get_job(valid_job.id)
-        self.assertEqual(reopened.status, "analyzing")
+        self.assertEqual(reopened.status, "live")
         self.assertIsNone(reopened.completed_at)
         self.assertEqual(
             (
@@ -378,9 +378,9 @@ class RepositoryPostgresTests(unittest.TestCase):
         )
 
         self.store.mark_game_published(second.id)
-        self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
+        self.assertEqual(self.store.get_job(valid_job.id).status, "live")
         self.store.store_joined_result(self.result(second.pipeline_game_id))
-        self.assertEqual(self.store.get_job(valid_job.id).status, "analyzing")
+        self.assertEqual(self.store.get_job(valid_job.id).status, "live")
         self.store.finish_ingestion(valid_job.id, "worker-a")
         completed = self.store.get_job(valid_job.id)
         self.assertEqual(completed.status, "completed")
@@ -393,14 +393,14 @@ class RepositoryPostgresTests(unittest.TestCase):
         only_valid = self.store.upsert_parsed_game(invalid_job.id, self.parsed(1))
         self.store.mark_game_published(only_valid.id)
         self.store.store_joined_result(self.result(only_valid.pipeline_game_id))
-        self.assertEqual(self.store.get_job(invalid_job.id).status, "analyzing")
+        self.assertEqual(self.store.get_job(invalid_job.id).status, "live")
 
         self.store.record_invalid_game(
             invalid_job.id,
             InvalidGame(2, "invalid_pgn", "late illegal move"),
         )
         reopened_after_invalid = self.store.get_job(invalid_job.id)
-        self.assertEqual(reopened_after_invalid.status, "analyzing")
+        self.assertEqual(reopened_after_invalid.status, "live")
         self.assertIsNone(reopened_after_invalid.completed_at)
         self.store.finish_ingestion(invalid_job.id, "worker-a")
         self.assertEqual(self.store.get_job(invalid_job.id).status, "partial")

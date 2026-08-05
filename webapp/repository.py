@@ -30,9 +30,9 @@ from webapp.models import (
     GAME_STATUS_COMPLETED,
     GAME_STATUS_FAILED,
     GAME_STATUS_QUEUED,
-    JOB_STATUS_ANALYZING,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_FAILED,
+    JOB_STATUS_LIVE,
     JOB_STATUS_PARSING,
     JOB_STATUS_PARTIAL,
     JOB_STATUS_QUEUED,
@@ -88,7 +88,7 @@ class SqlAlchemyAnalysisStore:
                 ),
                 sa.and_(
                     AnalysisJob.status.in_(
-                        (JOB_STATUS_PARSING, JOB_STATUS_ANALYZING)
+                        (JOB_STATUS_PARSING, JOB_STATUS_LIVE)
                     ),
                     AnalysisJob.lease_expires_at.is_not(None),
                     AnalysisJob.lease_expires_at <= now,
@@ -229,7 +229,7 @@ class SqlAlchemyAnalysisStore:
             job.queued_games -= 1
             job.analyzing_games += 1
             if job.status not in TERMINAL_JOB_STATUSES:
-                job.status = JOB_STATUS_ANALYZING
+                job.status = JOB_STATUS_LIVE
             job.updated_at = datetime.now(UTC)
             session.flush()
             _add_game_event(session, job, game, _game_snapshot(game))
@@ -283,7 +283,7 @@ class SqlAlchemyAnalysisStore:
                 job.status = _terminal_status(job)
                 job.completed_at = now
             else:
-                job.status = JOB_STATUS_ANALYZING
+                job.status = JOB_STATUS_LIVE
             job.updated_at = now
             session.flush()
             _add_job_event(session, job, _job_snapshot(job))
@@ -335,7 +335,7 @@ class SqlAlchemyAnalysisStore:
                 job.status = _terminal_status(job)
                 job.completed_at = now
             elif job.status not in TERMINAL_JOB_STATUSES:
-                job.status = JOB_STATUS_ANALYZING
+                job.status = JOB_STATUS_LIVE
             job.updated_at = now
             session.flush()
             _add_game_event(session, job, game, _game_snapshot(game))
