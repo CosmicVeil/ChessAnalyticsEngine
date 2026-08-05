@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-test-status="running">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../../webapp/static/css/site.css?browser-test=1">
+    <title>Analysis card browser test</title>
+  </head>
+  <body>
+    <main id="fixture"></main>
+    <pre id="report"></pre>
+    <script type="module">
+      import { buildCard } from "../../webapp/static/js/analysis.js?browser-test=1";
+
+      const game = {
+        id: "game-1",
+        sequence: 1,
+        status: "completed",
+        white: { name: "Ada", elo: 1800 },
+        black: { name: "Grace", elo: 1790 },
+        opening: "Sicilian Defense",
+        result: "1-0",
+        played_at: "2026-08-05T12:00:00+00:00",
+        error: null,
+        scores: {
+          pytorch: { score: 0.81, prediction: true },
+          xgboost: { score: 0.375, prediction: false },
+          agreement: false
+        }
+      };
+      const failures = [];
+      const check = (condition, message) => { if (!condition) failures.push(message); };
+      const fixture = document.querySelector("#fixture");
+      const card = buildCard(game);
+      fixture.append(card);
+
+      check(card.querySelector(".model-verdict.pytorch")?.textContent === "Says cheating", "positive verdict missing");
+      check(card.querySelector(".model-verdict.xgb")?.textContent === "Doesn't say cheating", "negative verdict missing");
+      check(!card.querySelector(".model-verdict")?.textContent.includes("%"), "collapsed row exposes percentages");
+      const disclosure = card.querySelector("details.game-detail");
+      check(Boolean(disclosure), "native disclosure missing");
+      if (disclosure) {
+        check(!disclosure.open, "disclosure should start closed");
+        check(disclosure.textContent.includes("81%"), "PyTorch percentage missing from details");
+        check(disclosure.textContent.includes("37.5%"), "XGBoost percentage missing from details");
+        const modelDetail = disclosure.querySelector(".model-detail");
+        check(Boolean(modelDetail), "model detail block missing");
+        if (modelDetail) {
+          check(modelDetail.getClientRects().length === 0, "closed details expose percentages");
+        }
+        disclosure.querySelector("summary")?.click();
+        await new Promise(requestAnimationFrame);
+        check(disclosure.open, "summary click did not open details");
+        if (modelDetail) {
+          check(modelDetail.getClientRects().length > 0, "opened details hide percentages");
+        }
+      }
+
+      const updated = buildCard({ ...game, status: "completed" }, card);
+      check(updated.querySelector("details.game-detail")?.open, "SSE rebuild lost open state");
+      check(updated.textContent.includes("50% decision threshold"), "threshold meaning missing");
+      check(updated.textContent.includes("uncalibrated model scores"), "score caveat missing");
+
+      document.querySelector("#report").textContent = failures.join("\n") || "PASS";
+      document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";
+    </script>
+  </body>
+</html>

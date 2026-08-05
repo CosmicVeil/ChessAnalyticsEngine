@@ -37,67 +37,6 @@ if (root) {
     applyVisibility(card);
   }
 
-  function buildCard(game, existing) {
-    const card = existing || element("article", "game-card is-new");
-    card.dataset.sequence = game.sequence;
-    card.dataset.status = game.status;
-    const scoreValues = game.scores ? [game.scores.pytorch.score, game.scores.xgboost.score] : [];
-    card.dataset.score = scoreValues.length ? Math.max(...scoreValues) : "";
-    card.dataset.agreement = game.scores ? (game.scores.agreement ? "agree" : "disagree") : "pending";
-    card.replaceChildren();
-
-    const identity = element("div", "game-id");
-    identity.append(element("span", "game-sequence", String(game.sequence).padStart(3, "0")));
-    const players = element("div", "game-players");
-    players.append(playerLine(game.white), playerLine(game.black));
-    players.append(element("div", "game-meta", [game.opening, game.result, game.played_at?.slice(0, 10)].filter(Boolean).join(" · ") || "Headers unavailable"));
-    identity.append(players);
-    card.append(identity);
-    card.append(scoreCell("pytorch", game.scores?.pytorch));
-    card.append(scoreCell("xgb", game.scores?.xgboost));
-
-    const state = element("div", "game-state");
-    state.append(element("span", `state-label ${game.status}`, game.status));
-    const toggle = element("button", "detail-toggle", "Details");
-    toggle.type = "button";
-    toggle.setAttribute("aria-expanded", "false");
-    state.append(toggle);
-    card.append(state);
-    const detail = element("div", "game-detail");
-    detail.hidden = true;
-    if (game.error) detail.append(element("span", "", `${game.error.code}: ${game.error.message}`));
-    if (game.scores) {
-      detail.append(element("span", "", `PyTorch: ${game.scores.pytorch.prediction ? "elevated" : "lower"}`));
-      detail.append(element("span", "", `XGBoost: ${game.scores.xgboost.prediction ? "elevated" : "lower"}`));
-      detail.append(element("span", "", game.scores.agreement ? "Models agree" : "Models disagree"));
-    }
-    if (!detail.children.length) detail.append(element("span", "", "Awaiting both model workers"));
-    toggle.addEventListener("click", () => {
-      detail.hidden = !detail.hidden;
-      toggle.setAttribute("aria-expanded", String(!detail.hidden));
-    });
-    card.append(detail);
-    return card;
-  }
-
-  function playerLine(player) {
-    const line = element("div", "player-line");
-    line.append(element("span", "", player.name || "Unknown player"));
-    line.append(element("small", "", player.elo ?? "—"));
-    return line;
-  }
-
-  function scoreCell(kind, score) {
-    const cell = element("div", `model-score ${kind}`);
-    cell.append(element("strong", "", score ? percent(score.score) : "—"));
-    const meter = element("span", "score-meter");
-    const fill = element("i");
-    fill.style.transform = `scaleX(${score?.score ?? 0})`;
-    meter.append(fill);
-    cell.append(meter);
-    return cell;
-  }
-
   function applyVisibility(card) {
     const data = new FormData(filters);
     const status = data.get("status");
@@ -160,6 +99,86 @@ if (root) {
     };
     requestAnimationFrame(tick);
   }
+}
+
+export function buildCard(game, existing) {
+  const detailWasOpen = existing?.querySelector("details.game-detail")?.open ?? false;
+  const card = existing || element("article", "game-card is-new");
+  card.dataset.sequence = game.sequence;
+  card.dataset.status = game.status;
+  const scoreValues = game.scores ? [game.scores.pytorch.score, game.scores.xgboost.score] : [];
+  card.dataset.score = scoreValues.length ? Math.max(...scoreValues) : "";
+  card.dataset.agreement = game.scores ? (game.scores.agreement ? "agree" : "disagree") : "pending";
+  card.replaceChildren();
+
+  const identity = element("div", "game-id");
+  identity.append(element("span", "game-sequence", String(game.sequence).padStart(3, "0")));
+  const players = element("div", "game-players");
+  players.append(playerLine(game.white), playerLine(game.black));
+  players.append(element("div", "game-meta", [game.opening, game.result, game.played_at?.slice(0, 10)].filter(Boolean).join(" · ") || "Headers unavailable"));
+  identity.append(players);
+  card.append(identity);
+  card.append(verdictCell("pytorch", "PyTorch", game.scores?.pytorch));
+  card.append(verdictCell("xgb", "XGBoost", game.scores?.xgboost));
+
+  const state = element("div", "game-state");
+  state.append(element("span", `state-label ${game.status}`, game.status));
+  card.append(state);
+
+  const detail = element("details", "game-detail");
+  detail.open = detailWasOpen;
+  detail.append(element("summary", "detail-toggle", "Details"));
+  const body = element("div", "game-detail-body");
+  if (game.error) {
+    body.append(element("p", "game-detail-note", `${game.error.code}: ${game.error.message}`));
+  }
+  if (game.scores) {
+    body.append(
+      modelDetail("PyTorch", game.scores.pytorch),
+      modelDetail("XGBoost", game.scores.xgboost),
+      element("p", "game-detail-note", game.scores.agreement ? "Models agree." : "Models disagree."),
+      element("p", "game-detail-note score-caveat", "These percentages are uncalibrated model scores, not measured accuracy, proof, or a calibrated probability that cheating occurred."),
+    );
+  }
+  if (!body.children.length) {
+    body.append(element("p", "game-detail-note", "Awaiting both model workers."));
+  }
+  detail.append(body);
+  card.append(detail);
+  return card;
+}
+
+function playerLine(player) {
+  const line = element("div", "player-line");
+  line.append(element("span", "", player.name || "Unknown player"));
+  line.append(element("small", "", player.elo ?? "—"));
+  return line;
+}
+
+function verdictCell(kind, modelName, score) {
+  const cell = element("div", `model-verdict ${kind}`);
+  const verdict = score
+    ? (score.prediction ? "Says cheating" : "Doesn't say cheating")
+    : "Waiting";
+  cell.setAttribute("aria-label", `${modelName}: ${verdict}`);
+  cell.append(element("strong", score?.prediction ? "positive" : "", verdict));
+  return cell;
+}
+
+function modelDetail(modelName, score) {
+  const detail = element("section", "model-detail");
+  detail.append(
+    element("h3", "", modelName),
+    element("strong", "model-detail-score", percent(score.score)),
+    element(
+      "p",
+      "",
+      score.prediction
+        ? "This score is at or above the 50% decision threshold. The model says cheating."
+        : "This score is below the 50% decision threshold. The model doesn't say cheating.",
+    ),
+  );
+  return detail;
 }
 
 function element(tag, className = "", text = "") {
