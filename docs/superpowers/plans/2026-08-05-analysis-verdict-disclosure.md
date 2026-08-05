@@ -2,19 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the broken custom detail toggle with a verdict-first native disclosure that reveals model percentages and their meaning.
+**Goal:** Deliver a verdict-first native disclosure with the approved `No cheating signal` copy and merge the complete feature into local `main`.
 
-**Architecture:** Keep the API and stored result shape unchanged. The existing browser renderer will convert each model prediction into a visible binary verdict, build one native `<details>` disclosure per card, and preserve that disclosure's open state when SSE updates rebuild the card. A browser harness will exercise the real renderer and native DOM interaction without adding a frontend dependency.
+**Architecture:** Keep the API and stored result shape unchanged. The browser renderer converts each model prediction into a visible binary verdict, builds one native `<details>` disclosure per card, and preserves that disclosure's open state when SSE updates rebuild the card. A browser harness exercises the real renderer and native DOM interaction; after verification, a temporary worktree merges the feature into local `main` without moving the user's unstaged training edit.
 
 **Tech Stack:** Flask/Jinja, browser-native ES modules and `<details>`, CSS Grid, Python `unittest`, in-app browser QA.
 
 ## Global Constraints
 
-- A true prediction reads `Says cheating`; a false prediction reads `Doesn't say cheating`; a missing prediction reads `Waiting`.
+- A true prediction reads `Says cheating`; a false prediction reads `No cheating signal`; a missing prediction reads `Waiting`.
 - Percentages appear only inside the expanded disclosure.
 - Details explain the 50% decision threshold and state that scores are uncalibrated model scores, not proof, measured accuracy, or calibrated probability.
 - An SSE rebuild preserves an existing disclosure's `open` state.
 - Do not change API payloads, persistence, Kafka topics, model inference, filtering, or the user's unstaged `ml-model/train_torch.py` changes.
+- Merge the complete `feature/more-features` history into local `main`; do not push or delete the feature branch.
 - Keep the existing editorial visual system and reduced-motion behavior.
 
 ---
@@ -88,7 +89,7 @@ Create `tests/frontend/analysis_card_browser.html`. Import `buildCard` from `../
       fixture.append(card);
 
       check(card.textContent.includes("Says cheating"), "positive verdict missing");
-      check(card.textContent.includes("Doesn't say cheating"), "negative verdict missing");
+      check(card.textContent.includes("No cheating signal"), "negative verdict missing");
       const disclosure = card.querySelector("details.game-detail");
       check(Boolean(disclosure), "native disclosure missing");
       check(!disclosure.open, "disclosure should start closed");
@@ -149,7 +150,7 @@ const detailWasOpen = existing?.querySelector("details.game-detail")?.open ?? fa
 function verdictCell(kind, score) {
   const cell = element("div", `model-verdict ${kind}`);
   const verdict = score
-    ? (score.prediction ? "Says cheating" : "Doesn't say cheating")
+    ? (score.prediction ? "Says cheating" : "No cheating signal")
     : "Waiting";
   cell.append(element("strong", score?.prediction ? "positive" : "", verdict));
   return cell;
@@ -169,7 +170,7 @@ const body = element("div", "game-detail-body");
 
 ```text
 This score is at or above the 50% decision threshold. The model says cheating.
-This score is below the 50% decision threshold. The model doesn't say cheating.
+This score is below the 50% decision threshold. The model produced no cheating signal.
 ```
 
 6. Append `Models agree.` or `Models disagree.` and this caveat:
@@ -223,14 +224,14 @@ Run:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
-GOCACHE=/private/tmp/chessanalytics-go-cache go test -count=1 ./...
+GOCACHE=/private/tmp/chessanalytics-go-cache go -C go-backend test -count=1 ./...
 node --check webapp/static/js/main.js
 node --check webapp/static/js/analyze.js
 node --check webapp/static/js/analysis.js
 git diff --check
 ```
 
-Expected: 106 or more Python tests pass with only service-gated skips, Go tests pass, all JavaScript syntax checks pass, and `git diff --check` is silent.
+Expected: 107 or more Python tests pass with only service-gated skips, Go tests pass, all JavaScript syntax checks pass, and `git diff --check` is silent.
 
 - [ ] **Step 7: Commit only the disclosure change**
 
@@ -240,3 +241,180 @@ git commit -m "fix: make model verdict details interactive"
 ```
 
 Confirm that `git status --short` still lists the user's `ml-model/train_torch.py` modification as unstaged.
+
+---
+
+### Task 2: Refine the negative verdict copy
+
+**Files:**
+- Modify: `tests/frontend/analysis_card_browser.html`
+- Modify: `webapp/static/js/analysis.js`
+
+**Interfaces:**
+- Consumes: `buildCard(game, existing)` and the existing false `score.prediction` value.
+- Produces: the collapsed verdict `No cheating signal` and expanded explanation `The model produced no cheating signal.`
+
+- [ ] **Step 1: Change the browser assertions first**
+
+In `tests/frontend/analysis_card_browser.html`, replace the negative-verdict assertion:
+
+```javascript
+check(
+  card.querySelector(".model-verdict.xgb")?.textContent === "No cheating signal",
+  "negative verdict missing",
+);
+```
+
+After the existing `const updated = buildCard(...)` line, add:
+
+```javascript
+check(
+  updated.textContent.includes("The model produced no cheating signal."),
+  "negative threshold explanation missing",
+);
+check(!updated.textContent.includes("Doesn't say cheating"), "old negative copy remains");
+```
+
+Increment the module and stylesheet cache-buster query from `browser-test=1` to `browser-test=2` so the browser loads the pre-fix renderer during the RED run.
+
+- [ ] **Step 2: Run the browser harness and verify RED**
+
+Serve the repository root:
+
+```bash
+.venv/bin/python -m http.server 8765 --bind 127.0.0.1
+```
+
+Open `http://127.0.0.1:8765/tests/frontend/analysis_card_browser.html?copy-red=1`.
+
+Expected: `data-test-status="failed"`; the report lists `negative verdict missing`, `negative threshold explanation missing`, and `old negative copy remains`.
+
+- [ ] **Step 3: Make the two production copy changes**
+
+In `verdictCell` within `webapp/static/js/analysis.js`, use:
+
+```javascript
+const verdict = score
+  ? (score.prediction ? "Says cheating" : "No cheating signal")
+  : "Waiting";
+```
+
+In `modelDetail`, use this false-prediction explanation:
+
+```text
+This score is below the 50% decision threshold. The model produced no cheating signal.
+```
+
+- [ ] **Step 4: Verify GREEN and run regressions**
+
+Reload the browser harness with `?copy-green=1`.
+
+Expected: `data-test-status="passed"`, the report reads `PASS`, pointer and keyboard activation still open the disclosure, and the console contains no errors.
+
+Run:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+GOCACHE=/private/tmp/chessanalytics-go-cache go -C go-backend test -count=1 ./...
+node --check webapp/static/js/main.js
+node --check webapp/static/js/analyze.js
+node --check webapp/static/js/analysis.js
+git diff --check
+```
+
+Expected: 107 or more Python tests pass with only service-gated skips, Go tests pass, JavaScript syntax is valid, and `git diff --check` is silent.
+
+- [ ] **Step 5: Commit the copy revision**
+
+```bash
+git add tests/frontend/analysis_card_browser.html webapp/static/js/analysis.js
+git commit -m "fix: refine negative model verdict"
+```
+
+Confirm `ml-model/train_torch.py` remains unstaged.
+
+---
+
+### Task 3: Merge the complete feature into local main
+
+**Files:**
+- Merge: `feature/more-features` into `main`
+- Preserve: `ml-model/train_torch.py` as an unstaged user modification
+
+**Interfaces:**
+- Consumes: the fully verified `feature/more-features` branch and local `main`.
+- Produces: local `main` containing the complete feature history and the unchanged user working-tree edit.
+
+- [ ] **Step 1: Record the protected edit and preflight the merge**
+
+Run from the original workspace:
+
+```bash
+git diff --binary -- ml-model/train_torch.py | shasum -a 256
+git status --short
+git merge-tree cb3044d3420ccae279427b04a768cd5ea7ae6e40 main feature/more-features
+```
+
+Record the hash. Status must list only ` M ml-model/train_torch.py`. The merge-tree output has one known add/add conflict, `README.md`; no application file conflicts are allowed.
+
+- [ ] **Step 2: Create a temporary main worktree**
+
+Confirm the task-specific path is unused, then let Git create the worktree:
+
+```bash
+test ! -e /private/tmp/chess-analytics-main-merge-20260805
+git worktree add /private/tmp/chess-analytics-main-merge-20260805 main
+```
+
+If the first command fails, stop rather than reusing or deleting the existing path. The original workspace and its unstaged file remain untouched.
+
+- [ ] **Step 3: Merge with the documented README resolution**
+
+In the temporary main worktree, run:
+
+```bash
+git merge --no-ff -X theirs feature/more-features -m "Merge branch 'feature/more-features'"
+git status --short
+```
+
+`-X theirs` resolves the known add/add `README.md` conflict in favor of the feature branch's comprehensive Flask, PostgreSQL, preprocessing, and operations documentation. Expected status: clean. If any other conflict appears, stop without resolving it.
+
+- [ ] **Step 4: Verify the merged main tree**
+
+Run the Python interpreter from the original environment against the temporary worktree:
+
+```bash
+/Users/mohandixit/Documents/GitHub/ChessAnalyticsEngine/.venv/bin/python -m unittest discover -s tests -v
+GOCACHE=/private/tmp/chessanalytics-go-cache go -C go-backend test -count=1 ./...
+node --check webapp/static/js/main.js
+node --check webapp/static/js/analyze.js
+node --check webapp/static/js/analysis.js
+git diff --check
+```
+
+Expected: 107 or more Python tests pass with only service-gated skips, Go tests pass, JavaScript syntax is valid, and the merged worktree is clean.
+
+- [ ] **Step 5: Remove the temporary worktree and switch the original workspace**
+
+From the original repository, remove only the newly created clean worktree:
+
+```bash
+git worktree remove /private/tmp/chess-analytics-main-merge-20260805
+git worktree prune
+git switch main
+```
+
+Do not stash, stage, or commit `ml-model/train_torch.py`. If `git switch main` refuses, stop and leave the current workspace unchanged.
+
+- [ ] **Step 6: Prove the user edit and main history are intact**
+
+Run:
+
+```bash
+git diff --binary -- ml-model/train_torch.py | shasum -a 256
+git status --short
+git branch --show-current
+git log --oneline -5
+```
+
+The before/after hashes must match, status must list only ` M ml-model/train_torch.py`, the branch must be `main`, and the log must show the merge commit containing the copy revision. Keep `feature/more-features`; do not push either branch.
