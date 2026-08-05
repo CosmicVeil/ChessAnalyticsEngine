@@ -1,0 +1,88 @@
+"""Environment-backed configuration for the Flask analysis adapter."""
+
+import os
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+
+
+DEFAULT_KAFKA_BOOTSTRAP_SERVERS = "localhost:19092"
+DEFAULT_KAFKA_WEB_RESULT_GROUP = "chess-web-results-v1"
+DEFAULT_PGN_SPOOL_DIRECTORY = Path(".runtime/pgn-spool")
+DEFAULT_MAX_PGN_UPLOAD_BYTES = 4 * 1024**3
+DEFAULT_MAX_PASTED_PGN_BYTES = 10 * 1024**2
+DEFAULT_SECRET_KEY = "development-only-change-me"
+
+
+def _read_text(
+    environ: Mapping[str, str], variable: str, default: str | None = None
+) -> str:
+    value = environ.get(variable, "").strip()
+    if value:
+        return value
+    if default is not None:
+        return default
+    raise ValueError(f"{variable} is required")
+
+
+def _read_positive_integer(
+    environ: Mapping[str, str], variable: str, default: int
+) -> int:
+    raw_value = environ.get(variable)
+    if raw_value is None or not raw_value.strip():
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{variable} must be a positive integer") from error
+
+    if value <= 0:
+        raise ValueError(f"{variable} must be a positive integer")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    """Immutable process configuration for web and worker entry points."""
+
+    database_url: str
+    kafka_bootstrap_servers: str = DEFAULT_KAFKA_BOOTSTRAP_SERVERS
+    kafka_web_result_group: str = DEFAULT_KAFKA_WEB_RESULT_GROUP
+    pgn_spool_directory: Path = DEFAULT_PGN_SPOOL_DIRECTORY
+    max_pgn_upload_bytes: int = DEFAULT_MAX_PGN_UPLOAD_BYTES
+    max_pasted_pgn_bytes: int = DEFAULT_MAX_PASTED_PGN_BYTES
+    secret_key: str = DEFAULT_SECRET_KEY
+
+    @classmethod
+    def from_env(
+        cls, environ: Mapping[str, str] | None = None
+    ) -> "Settings":
+        source = os.environ if environ is None else environ
+        return cls(
+            database_url=_read_text(source, "DATABASE_URL"),
+            kafka_bootstrap_servers=_read_text(
+                source,
+                "KAFKA_BOOTSTRAP_SERVERS",
+                DEFAULT_KAFKA_BOOTSTRAP_SERVERS,
+            ),
+            kafka_web_result_group=_read_text(
+                source,
+                "KAFKA_WEB_RESULT_GROUP",
+                DEFAULT_KAFKA_WEB_RESULT_GROUP,
+            ),
+            pgn_spool_directory=Path(
+                _read_text(
+                    source,
+                    "PGN_SPOOL_DIRECTORY",
+                    str(DEFAULT_PGN_SPOOL_DIRECTORY),
+                )
+            ),
+            max_pgn_upload_bytes=_read_positive_integer(
+                source, "MAX_PGN_UPLOAD_BYTES", DEFAULT_MAX_PGN_UPLOAD_BYTES
+            ),
+            max_pasted_pgn_bytes=_read_positive_integer(
+                source, "MAX_PASTED_PGN_BYTES", DEFAULT_MAX_PASTED_PGN_BYTES
+            ),
+            secret_key=_read_text(source, "SECRET_KEY", DEFAULT_SECRET_KEY),
+        )

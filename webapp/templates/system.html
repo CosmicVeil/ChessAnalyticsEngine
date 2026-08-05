@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Inside the system — Chess Analytics Engine{% endblock %}
+{% block page %}system{% endblock %}
+{% block content %}
+<header class="page-intro system-intro scroll-scene">
+  <p class="eyebrow">System drawing / revision 04</p>
+  <h1>One game.<br><em>Seven hand-offs.</em></h1>
+  <p>The web adapter stays outside the core. It adds durable job state before the existing Go and Python processes do the work they already know.</p>
+  <img class="piece system-bishop" src="{{ url_for('static', filename='assets/bishop.png') }}" alt="" data-depth="-0.05">
+</header>
+
+<section class="system-scroll" data-system-scroll aria-labelledby="pipeline-title">
+  <div class="system-sticky">
+    <div class="system-caption"><p class="section-index">02 / PIPELINE</p><h2 id="pipeline-title">Follow the message</h2><p data-stage-copy>A PGN source becomes a durable queued job.</p></div>
+    <div class="pipeline-map" data-pipeline-map>
+      <div class="pipeline-line"><i data-pipeline-progress></i></div>
+      <article class="pipeline-node is-active" data-stage="0"><span>01</span><b>Flask</b><small>spool + job</small></article>
+      <article class="pipeline-node" data-stage="1"><span>02</span><b>chess-moves</b><small>ordered SAN</small></article>
+      <article class="pipeline-node" data-stage="2"><span>03</span><b>Go</b><small>board features</small></article>
+      <article class="pipeline-node" data-stage="3"><span>04</span><b>aggregate</b><small>one row / game</small></article>
+      <article class="pipeline-node model-node" data-stage="4"><span>05A</span><b>PyTorch</b><small>L2 + sigmoid</small></article>
+      <article class="pipeline-node model-node" data-stage="5"><span>05B</span><b>XGBoost</b><small>training min / range</small></article>
+      <article class="pipeline-node" data-stage="6"><span>06</span><b>PostgreSQL</b><small>result + event</small></article>
+    </div>
+    <div class="message-ticket" data-message-ticket><span>GAME</span><b>web:…:001</b><small>event 0001 → 0007</small></div>
+  </div>
+</section>
+
+<section class="architecture-notes">
+  <article class="reveal"><p class="section-index">03 / BOUNDARY</p><h2>Flask remains separate.</h2><p>HTTP requests never import PyTorch or XGBoost. The web process writes jobs. Companion workers bridge those jobs to the unchanged Kafka topics.</p></article>
+  <article class="reveal"><p class="eyebrow">Model interpretation</p><h3>Scores, not verdicts.</h3><p>Both values are model-estimated suspicious-play scores from zero to one. There is no probability-calibration stage, and the interface never labels a player a cheater.</p></article>
+  <article class="reveal acid-note"><p class="eyebrow">Recovery</p><h3>Replay is ordinary.</h3><p>Leases recover abandoned jobs. Stable game IDs and unique result rows make a repeated Kafka message safe. SSE resumes from its last durable event ID.</p></article>
+</section>
+{% endblock %}

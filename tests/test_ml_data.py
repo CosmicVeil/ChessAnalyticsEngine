@@ -8,6 +8,7 @@ import warnings
 from unittest.mock import patch
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 
@@ -23,6 +24,50 @@ def load_module(module_name, relative_path):
 
 
 class TrainingDataTests(unittest.TestCase):
+    def test_xgboost_preprocessing_fits_min_and_range_on_training_rows_only(self):
+        preprocessing = load_module(
+            "model_preprocessing", "ml-model/model_preprocessing.py"
+        )
+        features = np.array(
+            [[0.0, 5.0], [10.0, 5.0], [100.0, 50.0]], dtype="float32"
+        )
+
+        X_train, X_test, minimum, safe_range = preprocessing.prepare_min_max_splits(
+            features,
+            np.array([0, 1]),
+            np.array([2]),
+        )
+
+        np.testing.assert_allclose(minimum, [0.0, 5.0])
+        np.testing.assert_allclose(safe_range, [10.0, 1.0])
+        np.testing.assert_allclose(X_train, [[0.0, 0.0], [1.0, 0.0]])
+        np.testing.assert_allclose(X_test, [[10.0, 45.0]])
+
+    def test_xgboost_preprocessing_sidecar_preserves_schema_and_parameters(self):
+        preprocessing = load_module(
+            "model_preprocessing", "ml-model/model_preprocessing.py"
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            model_directory = Path(temporary_directory)
+            saved_path = preprocessing.save_xgboost_preprocessing(
+                ["move_count", "rating_diff_mean"],
+                np.array([1.0, -20.0], dtype="float32"),
+                np.array([9.0, 40.0], dtype="float32"),
+                model_directory,
+            )
+            artifact = preprocessing.load_xgboost_preprocessing(model_directory)
+
+        self.assertEqual(saved_path.name, "xgboost_preprocessing.json")
+        self.assertEqual(artifact["version"], 1)
+        self.assertEqual(artifact["transform"], "min_max")
+        self.assertEqual(
+            artifact["feature_names"], ["move_count", "rating_diff_mean"]
+        )
+        self.assertEqual(artifact["minimum"], [1.0, -20.0])
+        self.assertEqual(artifact["range"], [9.0, 40.0])
+        self.assertEqual(len(artifact["feature_schema_sha256"]), 64)
+
     def test_launcher_runs_each_selected_model_in_a_separate_process(self):
         sys.path.insert(0, str(REPOSITORY_ROOT / "ml-model"))
         previous_directory = Path.cwd()
@@ -82,6 +127,62 @@ class TrainingDataTests(unittest.TestCase):
         self.assertEqual(rows[0]["Cheating"], "0")
         self.assertEqual(rows[1]["rating_diff"], "125")
         self.assertEqual(rows[1]["Cheating"], "1")
+
+    def test_collector_preserves_snake_case_analysis_features(self):
+        csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            csv_path = Path(temporary_directory) / "chess_dataset.csv"
+            csv_dataset.append_labeled_record(
+                csv_path,
+                {
+                    "game_id": "analysis-game Clean",
+                    "move_number": 1,
+                    "centipawn_loss": 37,
+                    "evaluation": -18,
+                    "win_chance": 0.42,
+                    "mate": 0,
+                    "num_major_pieces": 6,
+                    "num_minor_pieces": 4,
+                    "material_swings": 2,
+                },
+                "analysis-game Clean",
+            )
+
+            with csv_path.open(newline="") as csv_file:
+                row = next(csv.DictReader(csv_file))
+
+        self.assertEqual(row["centipawn_loss"], "37")
+        self.assertEqual(row["evaluation"], "-18")
+        self.assertEqual(row["win_chance"], "0.42")
+        self.assertEqual(row["num_major_pieces"], "6")
+
+    def test_delivery_helper_flushes_before_committing_the_message(self):
+        kafka_delivery = load_module("kafka_delivery", "python-pipeline/kafka_delivery.py")
+        call_order = []
+
+        class FakeProducer:
+            def produce(self, topic, key, value):
+                call_order.append(("produce", topic, key, value))
+
+            def flush(self):
+                call_order.append(("flush",))
+                return 0
+
+        class FakeConsumer:
+            def commit(self, message, asynchronous):
+                call_order.append(("commit", message, asynchronous))
+
+        message = object()
+        kafka_delivery.publish_and_commit(
+            FakeProducer(), FakeConsumer(), message, "output-topic", "game-1", "payload"
+        )
+
+        self.assertEqual(call_order, [
+            ("produce", "output-topic", "game-1", "payload"),
+            ("flush",),
+            ("commit", message, False),
+        ])
 
     def test_reset_labeled_dataset_removes_the_previous_csv(self):
         csv_dataset = load_module("csv_dataset", "python-pipeline/csv_dataset.py")
@@ -267,6 +368,29 @@ class TrainingDataTests(unittest.TestCase):
             "move_count": 2.0,
         })
         self.assertIsNone(collector.complete_game("game-3 Clean"))
+
+    def test_game_feature_collector_keeps_a_completed_game_until_delivery_succeeds(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        collector = live_scoring.GameFeatureCollector(["move_count"])
+        collector.add_feature({"game_id": "game-5 Clean", "move_number": 1})
+
+        completed_game = collector.prepare_completed_game("game-5 Clean")
+
+        self.assertEqual(completed_game["features"]["move_count"], 1.0)
+        self.assertIsNotNone(collector.prepare_completed_game("game-5 Clean"))
+        collector.discard_game("game-5 Clean")
+        self.assertIsNone(collector.prepare_completed_game("game-5 Clean"))
+
+    def test_game_feature_collector_ignores_a_replayed_move(self):
+        live_scoring = load_module("live_scoring", "python-pipeline/live_scoring.py")
+        collector = live_scoring.GameFeatureCollector(["move_count"])
+        move = {"game_id": "game-6 Clean", "move_number": 1}
+
+        collector.add_feature(move)
+        collector.add_feature(move)
+
+        completed_game = collector.prepare_completed_game("game-6 Clean")
+        self.assertEqual(completed_game["features"]["move_count"], 1.0)
 
     def test_prediction_reporter_waits_for_both_model_scores(self):
         prediction_reporting = load_module(

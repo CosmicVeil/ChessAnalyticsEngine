@@ -41,6 +41,5 @@ def build_pytorch_model(input_size: int):
         nn.ReLU(),
         nn.Linear(60, 30),
         nn.ReLU(),
-        nn.Linear(30, 1),
-        nn.Sigmoid(),
+        nn.Linear(30, 1)
     )

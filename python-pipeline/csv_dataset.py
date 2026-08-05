@@ -11,8 +11,13 @@ DATASET_FIELDNAMES = (
     "rating_diff",
     "GameID",
     "Cheating",
-    "NumMajorPieces",
-    "NumMinorPieces"
+    "num_major_pieces",
+    "num_minor_pieces",
+    "material_swings",
+    "centipawn_loss",
+    "evaluation",
+    "win_chance",
+    "mate",
 )
 
 

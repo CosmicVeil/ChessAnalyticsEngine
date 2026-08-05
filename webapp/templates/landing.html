@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Chess Analytics Engine — Every move leaves a trace{% endblock %}
+{% block page %}landing{% endblock %}
+{% block content %}
+<section class="hero scroll-scene" aria-labelledby="hero-title">
+  <div class="coordinate coordinate-a" data-depth="0.08">A1—H8</div>
+  <div class="coordinate coordinate-b" data-depth="-0.05">PLY / 001</div>
+  <div class="board-field" data-board data-depth="0.025" aria-hidden="true"></div>
+  <img class="piece piece-knight" src="{{ url_for('static', filename='assets/knight.png') }}" alt="" data-depth="-0.09">
+  <img class="piece piece-bishop" src="{{ url_for('static', filename='assets/bishop.png') }}" alt="" data-depth="0.045">
+  <div class="hero-copy">
+    <p class="eyebrow"><span>Streaming game intelligence</span><span>Batch / live</span></p>
+    <h1 id="hero-title">Every move leaves a <em>statistical trace.</em></h1>
+    <p class="hero-deck">Send a tournament archive through the same feature pipeline that feeds two independently trained models. Watch each game resolve as its scores arrive.</p>
+    <div class="hero-actions">
+      <a class="button button-primary" href="{{ url_for('pages.analyze') }}">Open analysis desk <span>↗</span></a>
+      <a class="text-link" href="{{ url_for('pages.system') }}">Inspect the machinery</a>
+    </div>
+  </div>
+  <aside class="hero-readout" data-depth="0.07" aria-label="Current system capabilities">
+    <span class="readout-number">02</span>
+    <p>isolated model workers</p>
+    <span class="readout-rule"></span>
+    <span class="readout-number">01</span>
+    <p>durable result stream</p>
+  </aside>
+</section>
+
+<section class="benchmark" aria-labelledby="benchmark-title">
+  <div class="section-index">02 / BENCH</div>
+  <div>
+    <p class="eyebrow" id="benchmark-title">Local benchmark / reference hardware</p>
+    <div class="benchmark-grid">
+      <article><strong data-count="1500">1,500</strong><span>games / minute</span></article>
+      <article><strong data-count="87">87%</strong><span>classification accuracy</span></article>
+      <article><strong data-count="550">&lt;550</strong><span>milliseconds / result</span></article>
+      <article><strong data-count="5">&lt;5%</strong><span>false-positive rate</span></article>
+    </div>
+    <p class="benchmark-note">Measured locally on labeled benchmark data. Throughput and scores vary by hardware, corpus, and model artifact.</p>
+  </div>
+</section>
+
+<section class="manifesto reveal" aria-labelledby="manifesto-title">
+  <p class="section-index">03 / METHOD</p>
+  <div>
+    <h2 id="manifesto-title">Not a black box.<br>A visible chain of evidence.</h2>
+    <p>PGN enters in source order. Go reconstructs the board and extracts move-level signals. Game aggregates travel to separate PyTorch and XGBoost processes. PostgreSQL records every visible transition.</p>
+    <a class="text-link" href="{{ url_for('pages.system') }}">Follow one game through the system</a>
+  </div>
+  <ol class="method-list">
+    <li><span>01</span><b>Parse</b><small>Legal SAN, headers, clocks</small></li>
+    <li><span>02</span><b>Extract</b><small>Board and move features</small></li>
+    <li><span>03</span><b>Score × 2</b><small>Independent model processes</small></li>
+    <li><span>04</span><b>Stream</b><small>Durable game events</small></li>
+  </ol>
+</section>
+
+<section class="closing-cta scroll-scene">
+  <img class="piece piece-rook" src="{{ url_for('static', filename='assets/rook.png') }}" alt="" data-depth="-0.06">
+  <div class="closing-copy reveal">
+    <p class="eyebrow">Archive ready?</p>
+    <h2>Put the whole room<br>under review.</h2>
+    <a class="button button-acid" href="{{ url_for('pages.analyze') }}">Send the games</a>
+  </div>
+</section>
+{% endblock %}

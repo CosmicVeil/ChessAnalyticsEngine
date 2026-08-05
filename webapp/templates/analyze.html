@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Analysis desk — Chess Analytics Engine{% endblock %}
+{% block page %}analyze{% endblock %}
+{% block content %}
+<header class="page-intro desk-intro">
+  <p class="eyebrow">Input desk / batch 01</p>
+  <h1>Send the games.<br><em>Keep their order.</em></h1>
+  <p>One PGN can contain thousands of games. It is written to a private spool, parsed one game at a time, and removed when ingestion finishes.</p>
+  <div class="health-strip" data-health aria-live="polite">
+    <span><i></i> Checking pipeline</span><span>PostgreSQL —</span><span>Kafka —</span>
+  </div>
+</header>
+
+<section class="analysis-desk" aria-labelledby="source-title">
+  <div class="desk-number">01</div>
+  <div class="desk-workspace">
+    <p class="eyebrow" id="source-title">Choose one source</p>
+    <div class="source-tabs" role="tablist" aria-label="PGN source">
+      <button type="button" role="tab" aria-selected="true" data-mode-button="file"><span>01</span> PGN file</button>
+      <button type="button" role="tab" aria-selected="false" data-mode-button="paste"><span>02</span> Paste PGN</button>
+      <button type="button" role="tab" aria-selected="false" data-mode-button="lichess"><span>03</span> Lichess Study</button>
+    </div>
+
+    <form class="source-form" data-analysis-form novalidate>
+      <section class="source-panel is-active" role="tabpanel" data-mode-panel="file">
+        <label class="drop-zone" data-drop-zone>
+          <input type="file" name="pgn_file" accept=".pgn,application/x-chess-pgn,text/plain">
+          <span class="drop-mark">PGN</span>
+          <strong data-file-label>Drop a batch file here</strong>
+          <small>or choose from disk · up to 4 GiB by default</small>
+        </label>
+      </section>
+      <section class="source-panel" role="tabpanel" data-mode-panel="paste" hidden>
+        <label class="paste-field">
+          <span>PGN source</span>
+          <textarea name="pgn_text" rows="14" spellcheck="false" placeholder='[Event "Round 7"]&#10;[White "Player A"]&#10;[Black "Player B"]&#10;&#10;1. e4 c5 2. Nf3 ...'></textarea>
+          <small><b data-paste-count>0</b> bytes in browser · 10 MiB default limit</small>
+        </label>
+      </section>
+      <section class="source-panel" role="tabpanel" data-mode-panel="lichess" hidden>
+        <label class="paste-field lichess-field">
+          <span>Lichess Study URL</span>
+          <input type="url" name="lichess_url" placeholder="https://lichess.org/study/…">
+          <small>The desk preserves the URL, but this connector is deliberately not wired yet.</small>
+        </label>
+      </section>
+      <div class="submission-row">
+        <div class="privacy-note"><b>Private spool</b><span>Raw PGN is never returned by the API.</span></div>
+        <button class="button button-primary submit-analysis" type="submit">Queue analysis <span>↗</span></button>
+      </div>
+      <div class="form-status" data-form-status aria-live="polite"></div>
+    </form>
+  </div>
+  <aside class="desk-aside">
+    <p class="eyebrow">What happens next</p>
+    <ol>
+      <li><b>Accepted</b><span>PostgreSQL records a durable job.</span></li>
+      <li><b>Published</b><span>Moves enter the existing Kafka pipeline.</span></li>
+      <li><b>Resolved</b><span>Each game appears when both models report.</span></li>
+    </ol>
+  </aside>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/analyze.js') }}"></script>{% endblock %}

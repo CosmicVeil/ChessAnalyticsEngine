@@ -1,11 +1,22 @@
 #!/usr/bin/env python
 import os
+from pathlib import Path
 from random import choice
+import sys
 from confluent_kafka import Producer
 import chess.pgn
 import time
 import json
 
+
+PIPELINE_DIRECTORY = Path(__file__).resolve().parent
+if str(PIPELINE_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIRECTORY))
+
+from kafka_config import get_kafka_bootstrap_servers
+
+
+BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 
 # Whole pipeline transfers 1500 games in 1 minute.
@@ -13,7 +24,7 @@ if __name__ == '__main__':
 
     config = {
         # User-specific properties that you must set
-        'bootstrap.servers': 'localhost:19092',
+        'bootstrap.servers': BOOTSTRAP_SERVERS,
 
         # Fixed properties
         'acks': 'all'
@@ -39,7 +50,7 @@ if __name__ == '__main__':
 
 
     counter = 0
-    while counter < 10000:
+    while counter < 20000:
         curr_game = chess.pgn.read_game(pgn)
 
 
@@ -83,7 +94,7 @@ if __name__ == '__main__':
         counter+=1
 
     counter = 0
-    while counter < 5000:
+    while counter < 10000:
         curr_game = chess.pgn.read_game(pgn2)
 
 
