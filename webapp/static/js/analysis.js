@@ -20,6 +20,28 @@ export function jobConnectionState(status) {
   };
 }
 
+export function createLoadArbiter() {
+  let latestLoadId = 0;
+  let liveRevision = 0;
+  const liveGameRevisions = new Map();
+
+  return {
+    beginLoad() {
+      return Object.freeze({ id: ++latestLoadId, liveRevision });
+    },
+    isCurrent(load) {
+      return load.id === latestLoadId;
+    },
+    markLive(gameId) {
+      liveGameRevisions.set(gameId, ++liveRevision);
+    },
+    canApplyGame(load, gameId) {
+      return load.id === latestLoadId
+        && (liveGameRevisions.get(gameId) ?? 0) <= load.liveRevision;
+    },
+  };
+}
+
 const mountedControllers = new WeakMap();
 
 export function mountLiveAnalysis(root, jobId) {
@@ -32,6 +54,7 @@ export function mountLiveAnalysis(root, jobId) {
   const filters = root.querySelector("[data-filters]");
   const loadMore = root.querySelector("[data-load-more]");
   const cards = new Map();
+  const loadArbiter = createLoadArbiter();
   let nextCursor = null;
   let eventSource;
   let latestJobStatus = "queued";
@@ -94,15 +117,18 @@ export function mountLiveAnalysis(root, jobId) {
   }
 
   async function loadGames(reset = false) {
+    const load = loadArbiter.beginLoad();
     if (reset) { cards.clear(); ledger.replaceChildren(); nextCursor = null; }
     const params = new URLSearchParams(new FormData(filters));
     params.set("limit", "50");
     if (nextCursor) params.set("cursor", nextCursor);
     const response = await fetch(`/api/analyses/${jobId}/games?${params}`);
-    if (!response.ok || closed) return;
+    if (!response.ok || closed || !loadArbiter.isCurrent(load)) return;
     const page = await response.json();
-    if (closed) return;
-    page.items.forEach(upsertGame);
+    if (closed || !loadArbiter.isCurrent(load)) return;
+    page.items.forEach((game) => {
+      if (loadArbiter.canApplyGame(load, game.id)) upsertGame(game);
+    });
     nextCursor = page.next_cursor;
     loadMore.hidden = !page.has_more;
     ledger.setAttribute("aria-busy", "false");
@@ -133,6 +159,7 @@ export function mountLiveAnalysis(root, jobId) {
     eventSource.addEventListener("game.updated", (event) => {
       const payload = JSON.parse(event.data);
       updateJob(payload.job);
+      loadArbiter.markLive(payload.game.id);
       upsertGame(payload.game);
     });
   }).catch((error) => {

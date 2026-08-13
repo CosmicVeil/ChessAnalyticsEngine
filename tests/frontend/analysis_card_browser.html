@@ -12,6 +12,7 @@
     <script type="module">
       import {
         buildCard,
+        createLoadArbiter,
         jobConnectionState,
         mountLiveAnalysis,
       } from "../../webapp/static/js/analysis.js?browser-test=5";
@@ -35,6 +36,15 @@
       const failures = [];
       const check = (condition, message) => { if (!condition) failures.push(message); };
       check(typeof mountLiveAnalysis === "function", "live analysis controller export missing");
+      const arbiter = createLoadArbiter();
+      const staleLoad = arbiter.beginLoad();
+      const currentLoad = arbiter.beginLoad();
+      check(!arbiter.isCurrent(staleLoad), "older load can still commit state");
+      check(arbiter.isCurrent(currentLoad), "latest load cannot commit state");
+      const liveRaceLoad = arbiter.beginLoad();
+      arbiter.markLive("game-1");
+      check(!arbiter.canApplyGame(liveRaceLoad, "game-1"), "older fetch can overwrite an SSE game");
+      check(arbiter.canApplyGame(liveRaceLoad, "game-2"), "SSE update blocks unrelated fetched games");
       check(jobConnectionState("parsing").label === "Reading PGN", "parsing copy missing");
       check(jobConnectionState("live").label === "Live analysis", "live copy missing");
       check(jobConnectionState("analyzing").label === "Live analysis", "legacy copy missing");
