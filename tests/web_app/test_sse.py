@@ -67,7 +67,7 @@ class SseTests(unittest.TestCase):
         self.assertEqual(next(stream), b": keepalive\n\n")
         stream.close()
 
-    def test_endpoint_prefers_query_cursor_and_sets_stream_headers(self):
+    def _terminal_endpoint_client(self):
         store = FakeAnalysisStore()
         job = store.create_queued_job(
             SpooledSource("paste", "pgn", Path("/tmp/x"))
@@ -85,17 +85,47 @@ class SseTests(unittest.TestCase):
             ),
         )
         client = app.test_client()
+        return store, job, client
+
+    def test_endpoint_uses_greater_query_cursor_and_sets_stream_headers(self):
+        _store, job, client = self._terminal_endpoint_client()
 
         response = client.get(
-            f"/api/analyses/{job.id}/events?after=1",
-            headers={"Last-Event-ID": "0"},
+            f"/api/analyses/{job.id}/events?after=2",
+            headers={"Last-Event-ID": "1"},
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.mimetype, "text/event-stream")
         self.assertEqual(response.headers["X-Accel-Buffering"], "no")
-        self.assertNotIn(b"id: 1\n", response.data)
-        self.assertEqual(client.get(f"/api/analyses/{job.id}/events?after=-1").status_code, 400)
+        self.assertNotIn(b"id: 2\n", response.data)
+        self.assertIn(b"id: 3\n", response.data)
+
+    def test_endpoint_uses_greater_reconnect_header_cursor(self):
+        _store, job, client = self._terminal_endpoint_client()
+
+        response = client.get(
+            f"/api/analyses/{job.id}/events?after=1",
+            headers={"Last-Event-ID": "2"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b"id: 2\n", response.data)
+        self.assertIn(b"id: 3\n", response.data)
+
+    def test_endpoint_rejects_invalid_or_negative_cursor_from_either_source(self):
+        _store, job, client = self._terminal_endpoint_client()
+
+        invalid_urls_and_headers = (
+            (f"/api/analyses/{job.id}/events?after=-1", {}),
+            (f"/api/analyses/{job.id}/events?after=invalid", {}),
+            (f"/api/analyses/{job.id}/events?after=1", {"Last-Event-ID": "-1"}),
+            (f"/api/analyses/{job.id}/events?after=1", {"Last-Event-ID": "invalid"}),
+        )
+        for url, headers in invalid_urls_and_headers:
+            with self.subTest(url=url, headers=headers):
+                self.assertEqual(client.get(url, headers=headers).status_code, 400)
+
         self.assertEqual(client.get("/api/analyses/not-a-uuid/events").status_code, 404)
 
     def test_status_cursor_replays_only_events_committed_after_the_snapshot(self):

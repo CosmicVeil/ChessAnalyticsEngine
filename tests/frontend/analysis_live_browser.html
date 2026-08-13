@@ -54,8 +54,9 @@
       };
       const oldGame = game("old", 1, "Original");
       const staleGame = game("stale", 2, "Stale");
+      const firstLiveGame = game("first-live", 1, "First live arrival");
       let gameRequestCount = 0;
-      let nextGamesResponse = null;
+      let nextGamesResponse = "initial-error";
       let resolveRace;
       window.matchMedia = () => ({ matches: true });
       window.fetch = async (url) => {
@@ -66,6 +67,13 @@
           });
         }
         gameRequestCount += 1;
+        if (nextGamesResponse === "initial-error") {
+          nextGamesResponse = null;
+          return new Response(JSON.stringify({ error: { message: "Initial snapshot unavailable." } }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         if (nextGamesResponse === "error") {
           nextGamesResponse = null;
           return new Response(JSON.stringify({ error: { message: "Filter service unavailable." } }), {
@@ -77,7 +85,7 @@
           nextGamesResponse = null;
           return new Promise((resolve) => { resolveRace = resolve; });
         }
-        return new Response(JSON.stringify({ items: [oldGame, staleGame], next_cursor: null, has_more: false }), {
+        return new Response(JSON.stringify({ items: [firstLiveGame, oldGame, staleGame], next_cursor: null, has_more: false }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -104,10 +112,20 @@
       const filters = root.querySelector("[data-filters]");
       const ledger = root.querySelector("[data-game-ledger]");
       const filterStatus = root.querySelector("[data-filter-status]");
-      await waitFor(() => sources.length === 1 && ledger.children.length === 2);
+      await waitFor(() => sources.length === 1 && filterStatus.textContent.includes("Initial snapshot unavailable"));
 
       check(sources[0]?.url.endsWith("/events?after=12"), "EventSource did not resume after the status cursor");
-      check(ledger.children.length === 2, "initial game snapshot did not render");
+      check(sources.length === 1, "initial game error created the wrong number of EventSource instances");
+      check(filterStatus.textContent.includes("Initial snapshot unavailable"), "initial game error was not announced");
+      sources[0].emit("game.updated", { job, game: firstLiveGame });
+      await waitFor(() => ledger.textContent.includes("First live arrival"));
+      check(ledger.textContent.includes("First live arrival"), "live update did not render after the initial game error");
+
+      filters.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => ledger.children.length === 3);
+      check(sources.length === 1, "later filter load opened a duplicate EventSource");
+      check(ledger.textContent.includes("First live arrival"), "later filter load removed the live game");
+      check(ledger.textContent.includes("Original"), "later filter load did not recover the snapshot");
 
       filters.elements.score_min.value = "0.9";
       filters.elements.score_max.value = "0.2";
@@ -115,7 +133,7 @@
       filters.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise(requestAnimationFrame);
       check(gameRequestCount === requestsBeforeInvalid, "invalid range reached the API");
-      check(ledger.children.length === 2, "invalid range cleared the current ledger");
+      check(ledger.children.length === 3, "invalid range cleared the current ledger");
       check(filterStatus.textContent.includes("cannot exceed"), "invalid range was not announced");
       check(ledger.getAttribute("aria-busy") === "false", "invalid range left the ledger busy");
 
@@ -124,7 +142,7 @@
       nextGamesResponse = "error";
       filters.dispatchEvent(new Event("change", { bubbles: true }));
       await waitFor(() => filterStatus.textContent.includes("unavailable"));
-      check(ledger.children.length === 2, "API error cleared the current ledger");
+      check(ledger.children.length === 3, "API error cleared the current ledger");
       check(ledger.getAttribute("aria-busy") === "false", "API error left the ledger busy");
 
       nextGamesResponse = "race";

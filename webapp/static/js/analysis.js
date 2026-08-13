@@ -45,6 +45,11 @@ export function eventStreamUrl(jobId, eventCursor) {
   return `/api/analyses/${jobId}/events?after=${eventCursor}`;
 }
 
+export function startLiveSession({ terminal, loadGames, openStream }) {
+  void loadGames();
+  if (!terminal) openStream();
+}
+
 export function createLoadArbiter() {
   let latestLoadId = 0;
   let liveRevision = 0;
@@ -215,25 +220,30 @@ export function mountLiveAnalysis(root, jobId) {
   filters.addEventListener("input", handleFilterInput);
   loadMore.addEventListener("click", handleLoadMore);
 
-  loadStatus().then(async (eventCursor) => {
-    const gamesLoaded = await loadGames(true);
-    if (!gamesLoaded || closed || renderJobConnection().terminal) return;
-    eventSource = new EventSource(eventStreamUrl(jobId, eventCursor));
-    eventSource.addEventListener("open", () => renderJobConnection());
-    eventSource.addEventListener("error", () => {
-      if (jobConnectionState(latestJobStatus).terminal) {
-        renderJobConnection();
-        return;
-      }
-      connection.classList.add("is-offline");
-      connection.querySelector("span").textContent = "Reconnecting to live analysis";
-    });
-    eventSource.addEventListener("job.updated", (event) => updateJob(JSON.parse(event.data).job));
-    eventSource.addEventListener("game.updated", (event) => {
-      const payload = JSON.parse(event.data);
-      updateJob(payload.job);
-      loadArbiter.markLive(payload.game.id);
-      upsertGame(payload.game);
+  loadStatus().then((eventCursor) => {
+    if (closed) return;
+    startLiveSession({
+      terminal: renderJobConnection().terminal,
+      loadGames: () => loadGames(true),
+      openStream: () => {
+        eventSource = new EventSource(eventStreamUrl(jobId, eventCursor));
+        eventSource.addEventListener("open", () => renderJobConnection());
+        eventSource.addEventListener("error", () => {
+          if (jobConnectionState(latestJobStatus).terminal) {
+            renderJobConnection();
+            return;
+          }
+          connection.classList.add("is-offline");
+          connection.querySelector("span").textContent = "Reconnecting to live analysis";
+        });
+        eventSource.addEventListener("job.updated", (event) => updateJob(JSON.parse(event.data).job));
+        eventSource.addEventListener("game.updated", (event) => {
+          const payload = JSON.parse(event.data);
+          updateJob(payload.job);
+          loadArbiter.markLive(payload.game.id);
+          upsertGame(payload.game);
+        });
+      },
     });
   }).catch((error) => {
     if (closed) return;

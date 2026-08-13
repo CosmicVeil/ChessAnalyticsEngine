@@ -180,11 +180,11 @@ def get_events(job_id: uuid.UUID):
             return _error("job_not_found", "Analysis job was not found.", 404)
     except Exception:
         return _error("database_unavailable", "PostgreSQL is unavailable.", 503)
-    raw_after = request.args.get("after", request.headers.get("Last-Event-ID", "0"))
     try:
-        after_id = int(raw_after or 0)
-        if after_id < 0:
-            raise ValueError
+        after_id = max(
+            _event_id(request.args.get("after")),
+            _event_id(request.headers.get("Last-Event-ID")),
+        )
     except ValueError:
         return _error("invalid_event_id", "Event ID must be a non-negative integer.", 400)
     return Response(
@@ -192,6 +192,13 @@ def get_events(job_id: uuid.UUID):
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+def _event_id(raw_value: str | None) -> int:
+    event_id = int(raw_value or 0)
+    if event_id < 0:
+        raise ValueError
+    return event_id
 
 
 @api.get("/health")
