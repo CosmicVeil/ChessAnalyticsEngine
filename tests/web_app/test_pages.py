@@ -93,6 +93,35 @@ class FrontendPageTests(unittest.TestCase):
         self.assertIn("@media (max-width: 640px)", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
 
+    def test_visual_motion_and_focus_contracts_remain_accessible(self):
+        css = (ROOT / "webapp/static/css/site.css").read_text(encoding="utf-8").lower()
+
+        self.assertIn(
+            "translatex(calc((1 - var(--info-progress)) * 1.8rem))",
+            css,
+        )
+        self.assertNotIn(
+            "translatey(calc((1 - var(--info-progress))",
+            css,
+        )
+        self.assertIn(".drop-zone:focus-within", css)
+        self.assertIn("border-left: 1px dotted var(--line-bright)", css)
+        self.assertIn(".info-card:nth-child(2) { transition-delay: .06s; }", css)
+        self.assertIn(".info-card:nth-child(3) { transition-delay: .12s; }", css)
+        self.assertIn(".info-card:nth-child(4) { transition-delay: .18s; }", css)
+        self.assertIn("transition-delay: 0s !important", css)
+
+        tablet = css.split("@media (max-width: 980px)", 1)[1].split(
+            "@media (max-width: 640px)", 1
+        )[0]
+        self.assertIn(".info-preview { opacity: 1;", tablet)
+        self.assertNotIn("var(--info-progress)", tablet)
+
+        phone = css.split("@media (max-width: 640px)", 1)[1].split(
+            "@media (prefers-reduced-motion: reduce)", 1
+        )[0]
+        self.assertIn(".info-preview { min-height: 9.5rem; opacity: 1;", phone)
+
     def test_piece_assets_are_rgba_pngs_with_isolated_alpha(self):
         for name in ("knight.png", "rook.png", "bishop.png"):
             with self.subTest(name=name):
