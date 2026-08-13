@@ -65,6 +65,34 @@ class FrontendPageTests(unittest.TestCase):
         self.assertIn(b"assets/knight.png", landing)
         self.assertIn(b"live model scores from your", landing.lower())
 
+    def test_information_page_explains_the_product_with_honest_previews(self):
+        response = self.client.get("/system")
+
+        self.assertEqual(response.status_code, 200)
+        page = response.data
+        for copy in (
+            b"About Chess Analytics Engine",
+            b"What the site does",
+            b"How live updates work",
+            b"Important note",
+            b"Interface preview",
+            b"https://github.com/CosmicVeil/ChessAnalyticsEngine",
+        ):
+            with self.subTest(copy=copy):
+                self.assertIn(copy, page)
+        self.assertIn(b"data-info-scroll", page)
+        self.assertEqual(page.count(b"data-info-preview"), 4)
+        self.assertGreaterEqual(page.count(b"data-info-node"), 4)
+        self.assertIn(b"info-progress-spine", page)
+
+    def test_visual_styles_define_reference_palette_and_motion_fallbacks(self):
+        css = (ROOT / "webapp/static/css/site.css").read_text(encoding="utf-8").lower()
+
+        self.assertIn("--canvas: #030914", css)
+        self.assertIn("@media (max-width: 980px)", css)
+        self.assertIn("@media (max-width: 640px)", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+
     def test_piece_assets_are_rgba_pngs_with_isolated_alpha(self):
         for name in ("knight.png", "rook.png", "bishop.png"):
             with self.subTest(name=name):

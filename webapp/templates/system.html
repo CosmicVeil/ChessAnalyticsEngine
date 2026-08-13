@@ -1,34 +1,124 @@
 {% extends "base.html" %}
-{% block title %}Inside the system — Chess Analytics Engine{% endblock %}
+{% block title %}Information — Chess Analytics Engine{% endblock %}
 {% block page %}system{% endblock %}
 {% block content %}
-<header class="page-intro system-intro scroll-scene">
-  <p class="eyebrow">System drawing / revision 04</p>
-  <h1>One game.<br><em>Seven hand-offs.</em></h1>
-  <p>The web adapter stays outside the core. It adds durable job state before the existing Go and Python processes do the work they already know.</p>
-  <img class="piece system-bishop" src="{{ url_for('static', filename='assets/bishop.png') }}" alt="" data-depth="-0.05">
-</header>
-
-<section class="system-scroll" data-system-scroll aria-labelledby="pipeline-title">
-  <div class="system-sticky">
-    <div class="system-caption"><p class="section-index">02 / PIPELINE</p><h2 id="pipeline-title">Follow the message</h2><p data-stage-copy>A PGN source becomes a durable queued job.</p></div>
-    <div class="pipeline-map" data-pipeline-map>
-      <div class="pipeline-line"><i data-pipeline-progress></i></div>
-      <article class="pipeline-node is-active" data-stage="0"><span>01</span><b>Flask</b><small>spool + job</small></article>
-      <article class="pipeline-node" data-stage="1"><span>02</span><b>chess-moves</b><small>ordered SAN</small></article>
-      <article class="pipeline-node" data-stage="2"><span>03</span><b>Go</b><small>board features</small></article>
-      <article class="pipeline-node" data-stage="3"><span>04</span><b>aggregate</b><small>one row / game</small></article>
-      <article class="pipeline-node model-node" data-stage="4"><span>05A</span><b>PyTorch</b><small>L2 + sigmoid</small></article>
-      <article class="pipeline-node model-node" data-stage="5"><span>05B</span><b>XGBoost</b><small>training min / range</small></article>
-      <article class="pipeline-node" data-stage="6"><span>06</span><b>PostgreSQL</b><small>result + event</small></article>
+<div class="information-page">
+  <section class="info-overview reveal" aria-labelledby="about-title">
+    <div class="info-overview-copy">
+      <p class="eyebrow">Information / how it works</p>
+      <h1 id="about-title" aria-label="About Chess Analytics Engine">About <em>Chess Analytics Engine</em></h1>
+      <p>Chess Analytics Engine turns complete PGN game collections into game-level signals. It extracts board features, scores them with isolated PyTorch and XGBoost workers, and streams durable updates back to the browser.</p>
     </div>
-    <div class="message-ticket" data-message-ticket><span>GAME</span><b>web:…:001</b><small>event 0001 → 0007</small></div>
-  </div>
-</section>
+    <img class="piece info-bishop" src="{{ url_for('static', filename='assets/bishop.png') }}" alt="" data-depth="-0.025">
+  </section>
 
-<section class="architecture-notes">
-  <article class="reveal"><p class="section-index">03 / BOUNDARY</p><h2>Flask remains separate.</h2><p>HTTP requests never import PyTorch or XGBoost. The web process writes jobs. Companion workers bridge those jobs to the unchanged Kafka topics.</p></article>
-  <article class="reveal"><p class="eyebrow">Model interpretation</p><h3>Scores, not verdicts.</h3><p>Both values are model-estimated suspicious-play scores from zero to one. There is no probability-calibration stage, and the interface never labels a player a cheater.</p></article>
-  <article class="reveal acid-note"><p class="eyebrow">Recovery</p><h3>Replay is ordinary.</h3><p>Leases recover abandoned jobs. Stable game IDs and unique result rows make a repeated Kafka message safe. SSE resumes from its last durable event ID.</p></article>
-</section>
+  <section class="info-scroll-layout" data-info-scroll aria-label="Product information and illustrative interface previews">
+    <div class="info-copy-stack">
+      <article class="info-card reveal" data-info-card>
+        <div class="info-card-icon" aria-hidden="true">⌁</div>
+        <div>
+          <p class="info-step">01 / Analyze</p>
+          <h2>What the site does</h2>
+          <p>Upload a PGN or paste one or more games. The engine preserves their source order, extracts game-level features, and evaluates each game with both models.</p>
+          <ul class="info-points" aria-label="Analysis capabilities">
+            <li>Game-level feature extraction</li>
+            <li>Dual-model scoring</li>
+            <li>Results filtering</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="info-card reveal" data-info-card>
+        <div class="info-card-icon" aria-hidden="true">)))</div>
+        <div>
+          <p class="info-step">02 / Stream</p>
+          <h2>How live updates work</h2>
+          <p>Isolated workers process games in the background. Durable server events update the ledger as results arrive, without requiring a page reload.</p>
+          <ul class="info-points" aria-label="Live update properties">
+            <li>Background processing</li>
+            <li>Streamed updates</li>
+            <li>Replay-safe events</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="info-card reveal" data-info-card>
+        <div class="info-card-icon" aria-hidden="true">!</div>
+        <div>
+          <p class="info-step">03 / Interpret</p>
+          <h2>Important note</h2>
+          <p>Model scores are not calibrated probabilities and do not prove cheating. They are heuristic signals intended to support careful human review and investigation.</p>
+          <ul class="info-points" aria-label="Score limitations">
+            <li>Not probabilities</li>
+            <li>Not proof of cheating</li>
+            <li>Use human judgment</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="info-card info-contact reveal" data-info-card>
+        <div class="info-card-icon" aria-hidden="true">↗</div>
+        <div>
+          <p class="info-step">04 / Source</p>
+          <h2>Open implementation</h2>
+          <p>Inspect the application, workers, model adapters, and deployment notes in the public repository.</p>
+          <a class="button button-primary" href="https://github.com/CosmicVeil/ChessAnalyticsEngine" target="_blank" rel="noreferrer">View on GitHub <span aria-hidden="true">↗</span></a>
+          <p class="info-url">https://github.com/CosmicVeil/ChessAnalyticsEngine</p>
+        </div>
+      </article>
+    </div>
+
+    <aside class="info-visual-column" aria-label="Illustrative interface preview sequence">
+      <div class="info-visual-sticky">
+        <div class="info-progress-spine" aria-hidden="true">
+          <i></i>
+          <span class="is-active" data-info-node>1</span>
+          <span data-info-node>2</span>
+          <span data-info-node>3</span>
+          <span data-info-node>4</span>
+        </div>
+
+        <div class="info-preview-stack">
+          <figure class="info-preview preview-upload" data-info-preview style="--preview-tilt: 1.4deg">
+            <figcaption>Interface preview <span>Illustrative</span></figcaption>
+            <div class="mini-upload-mark" aria-hidden="true">↑</div>
+            <strong>Upload PGN</strong>
+            <p>Drop a PGN file or choose from disk</p>
+            <small>Preview only — no file selected</small>
+          </figure>
+
+          <figure class="info-preview preview-game" data-info-preview style="--preview-tilt: -1.2deg">
+            <figcaption>Interface preview <span>Illustrative</span></figcaption>
+            <div class="mini-board" aria-hidden="true">
+              {% for index in range(16) %}<span{% if (index // 4 + index % 4) % 2 %} class="is-dark"{% endif %}></span>{% endfor %}
+            </div>
+            <div class="mini-game-copy">
+              <p><span>White</span><b>Player A</b></p>
+              <p><span>Black</span><b>Player B</b></p>
+              <strong>1–0</strong><small>Example result</small>
+            </div>
+          </figure>
+
+          <figure class="info-preview preview-ledger" data-info-preview style="--preview-tilt: 1deg">
+            <figcaption>Interface preview <span>Illustrative result states</span></figcaption>
+            <div class="mini-table" aria-label="Example ledger rows">
+              <div><b>Game</b><b>Models</b><b>State</b></div>
+              <div><span>01</span><span>agree</span><em>completed</em></div>
+              <div><span>02</span><span>pending</span><em class="processing">analyzing</em></div>
+              <div><span>03</span><span>—</span><em class="queued">queued</em></div>
+            </div>
+          </figure>
+
+          <figure class="info-preview preview-distribution" data-info-preview style="--preview-tilt: -1.4deg">
+            <figcaption>Interface preview <span>Illustrative distribution</span></figcaption>
+            <div class="mini-bars" aria-hidden="true">
+              <i style="--bar-height: 18%"></i><i style="--bar-height: 33%"></i><i style="--bar-height: 52%"></i><i style="--bar-height: 82%"></i><i style="--bar-height: 100%"></i><i style="--bar-height: 74%"></i><i style="--bar-height: 49%"></i><i style="--bar-height: 27%"></i><i style="--bar-height: 12%"></i>
+            </div>
+            <div class="mini-axis"><span>0.00</span><span>Model score</span><span>1.00</span></div>
+          </figure>
+        </div>
+      </div>
+    </aside>
+  </section>
+</div>
 {% endblock %}
