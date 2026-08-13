@@ -9,6 +9,7 @@ from tests.web_app.fakes import FakeAnalysisStore
 from webapp import create_app
 from webapp.config import Settings
 from webapp.domain import (
+    InvalidGame,
     JobEventSnapshot,
     ParsedGame,
     SpooledSource,
@@ -77,7 +78,11 @@ class SseTests(unittest.TestCase):
         store.finish_ingestion(job.id, "w")
         app = create_app(
             Settings(database_url="postgresql+psycopg://unused"),
-            WebDependencies(store=store, spool_service=object(), health_probe=object()),
+            WebDependencies(
+                store=store,
+                spool_service=object(),
+                health_probe=object(),
+            ),
         )
         client = app.test_client()
 
@@ -92,6 +97,37 @@ class SseTests(unittest.TestCase):
         self.assertNotIn(b"id: 1\n", response.data)
         self.assertEqual(client.get(f"/api/analyses/{job.id}/events?after=-1").status_code, 400)
         self.assertEqual(client.get("/api/analyses/not-a-uuid/events").status_code, 404)
+
+    def test_status_cursor_replays_only_events_committed_after_the_snapshot(self):
+        store = FakeAnalysisStore()
+        job = store.create_queued_job(
+            SpooledSource("paste", "pgn", Path("/tmp/x"))
+        )
+        store.claim_next_job(
+            "w", datetime(2026, 8, 4, tzinfo=UTC), timedelta(minutes=1)
+        )
+        app = create_app(
+            Settings(database_url="postgresql+psycopg://unused"),
+            WebDependencies(store=store, spool_service=object(), health_probe=object()),
+        )
+        client = app.test_client()
+        status = client.get(f"/api/analyses/{job.id}").get_json()
+        cursor = status["event_cursor"]
+        historical_ids = [event.id for event in store.events]
+
+        store.record_invalid_game(
+            job.id, InvalidGame(1, "invalid_pgn", "illegal move")
+        )
+        store.finish_ingestion(job.id, "w")
+        new_ids = [event.id for event in store.events if event.id > cursor]
+
+        response = client.get(f"/api/analyses/{job.id}/events?after={cursor}")
+
+        self.assertTrue(new_ids)
+        for event_id in historical_ids:
+            self.assertNotIn(f"id: {event_id}\n".encode(), response.data)
+        for event_id in new_ids:
+            self.assertIn(f"id: {event_id}\n".encode(), response.data)
 
 
 if __name__ == "__main__":

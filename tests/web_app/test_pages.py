@@ -56,6 +56,15 @@ class FrontendPageTests(unittest.TestCase):
             self.assertIn(b'name="score_max"', response.data)
         self.assertIn(f'data-job-id="{job_id}"'.encode(), analysis.data)
 
+    def test_home_attaches_unavailable_state_to_lichess_tab_and_filter_errors(self):
+        page = self.client.get("/").data
+
+        self.assertIn(b'role="tablist" aria-orientation="horizontal"', page)
+        self.assertIn(b'data-mode-button="lichess"', page)
+        self.assertIn(b'<span class="availability-badge">Coming soon</span>', page)
+        self.assertIn(b'data-filter-status', page)
+        self.assertIn(b'aria-live="polite"', page)
+
     def test_visual_system_avoids_disallowed_design_shortcuts(self):
         css = (ROOT / "webapp/static/css/site.css").read_text(encoding="utf-8").lower()
         for banned in ("linear-gradient", "radial-gradient", "backdrop-filter", "#8b5cf6"):

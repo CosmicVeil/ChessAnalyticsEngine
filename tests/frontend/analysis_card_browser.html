@@ -13,8 +13,10 @@
       import {
         buildCard,
         createLoadArbiter,
+        eventStreamUrl,
         jobConnectionState,
         mountLiveAnalysis,
+        validateScoreRange,
       } from "../../webapp/static/js/analysis.js?browser-test=5";
 
       const game = {
@@ -36,6 +38,8 @@
       const failures = [];
       const check = (condition, message) => { if (!condition) failures.push(message); };
       check(typeof mountLiveAnalysis === "function", "live analysis controller export missing");
+      check(validateScoreRange(new URLSearchParams({ score_min: ".8", score_max: ".2" })) !== null, "inverted score range passed client validation");
+      check(eventStreamUrl("job-1", 42) === "/api/analyses/job-1/events?after=42", "event stream omitted its resume cursor");
       const arbiter = createLoadArbiter();
       const staleLoad = arbiter.beginLoad();
       const currentLoad = arbiter.beginLoad();
@@ -45,6 +49,8 @@
       arbiter.markLive("game-1");
       check(!arbiter.canApplyGame(liveRaceLoad, "game-1"), "older fetch can overwrite an SSE game");
       check(arbiter.canApplyGame(liveRaceLoad, "game-2"), "SSE update blocks unrelated fetched games");
+      check(!arbiter.canRemoveGame(liveRaceLoad, "game-1", new Set()), "reset removes an SSE-updated game");
+      check(arbiter.canRemoveGame(liveRaceLoad, "game-2", new Set()), "reset keeps a stale unfetched game");
       check(jobConnectionState("parsing").label === "Reading PGN", "parsing copy missing");
       check(jobConnectionState("live").label === "Live analysis", "live copy missing");
       check(jobConnectionState("analyzing").label === "Live analysis", "legacy copy missing");

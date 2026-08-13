@@ -1,10 +1,38 @@
 import { mountLiveAnalysis } from "./analysis.js";
 
-export function mountSourceTabs(root = document) {
+export function tabOrientation(isMobile) {
+  return isMobile ? "vertical" : "horizontal";
+}
+
+export function tabTargetIndex(current, key, count, orientation) {
+  if (key === "Home") return 0;
+  if (key === "End") return count - 1;
+  const nextKey = orientation === "vertical" ? "ArrowDown" : "ArrowRight";
+  const previousKey = orientation === "vertical" ? "ArrowUp" : "ArrowLeft";
+  if (key === nextKey) return (current + 1) % count;
+  if (key === previousKey) return (current - 1 + count) % count;
+  return null;
+}
+
+export function isPgnFile(file) {
+  if (!file) return false;
+  return /\.pgn$/i.test(file.name)
+    || file.type === "application/x-chess-pgn";
+}
+
+export function mountSourceTabs(
+  root = document,
+  mobileQuery = window.matchMedia("(max-width: 640px)"),
+) {
+  const tablist = root.querySelector("[role=tablist]");
   const buttons = [...root.querySelectorAll("[data-mode-button]")];
   const panels = [...root.querySelectorAll("[data-mode-panel]")];
   const status = root.querySelector("[data-form-status]");
   let mode = buttons.find((button) => button.getAttribute("aria-selected") === "true")?.dataset.modeButton || "file";
+
+  function syncOrientation() {
+    tablist?.setAttribute("aria-orientation", tabOrientation(mobileQuery.matches));
+  }
 
   function selectMode(nextMode) {
     mode = nextMode;
@@ -20,11 +48,12 @@ export function mountSourceTabs(root = document) {
 
   function selectByKey(button, key) {
     const current = buttons.indexOf(button);
-    const target = key === "Home" ? 0
-      : key === "End" ? buttons.length - 1
-        : key === "ArrowRight" ? (current + 1) % buttons.length
-          : key === "ArrowLeft" ? (current - 1 + buttons.length) % buttons.length
-            : null;
+    const target = tabTargetIndex(
+      current,
+      key,
+      buttons.length,
+      tabOrientation(mobileQuery.matches),
+    );
     if (target === null) return;
     selectMode(buttons[target].dataset.modeButton);
     buttons[target].focus();
@@ -33,13 +62,23 @@ export function mountSourceTabs(root = document) {
   for (const button of buttons) {
     button.addEventListener("click", () => selectMode(button.dataset.modeButton));
     button.addEventListener("keydown", (event) => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      if (tabTargetIndex(
+        buttons.indexOf(button),
+        event.key,
+        buttons.length,
+        tabOrientation(mobileQuery.matches),
+      ) === null) return;
       event.preventDefault();
       selectByKey(button, event.key);
     });
   }
+  syncOrientation();
+  mobileQuery.addEventListener("change", syncOrientation);
   selectMode(mode);
-  return { get mode() { return mode; } };
+  return {
+    get mode() { return mode; },
+    close() { mobileQuery.removeEventListener("change", syncOrientation); },
+  };
 }
 
 const form = document.querySelector("[data-analysis-form]");
@@ -52,12 +91,33 @@ if (form) {
   const fileInput = form.elements.pgn_file;
   const fileLabel = document.querySelector("[data-file-label]");
   const dropZone = document.querySelector("[data-drop-zone]");
-  fileInput.addEventListener("change", () => {
+  const updateFileLabel = () => {
     const file = fileInput.files[0];
     fileLabel.textContent = file ? `${file.name} · ${formatBytes(file.size)}` : "Drop a batch file here";
+  };
+  fileInput.addEventListener("change", updateFileLabel);
+  for (const eventName of ["dragenter", "dragover"]) {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      dropZone.classList.add("is-dragging");
+    });
+  }
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("is-dragging"));
+  dropZone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    dropZone.classList.remove("is-dragging");
+    const file = event.dataTransfer?.files?.[0];
+    if (!isPgnFile(file)) {
+      status.textContent = "Drop one PGN file with a .pgn extension.";
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    fileInput.files = transfer.files;
+    updateFileLabel();
+    status.textContent = "";
   });
-  for (const eventName of ["dragenter", "dragover"]) dropZone.addEventListener(eventName, () => dropZone.classList.add("is-dragging"));
-  for (const eventName of ["dragleave", "drop"]) dropZone.addEventListener(eventName, () => dropZone.classList.remove("is-dragging"));
 
   const textarea = form.elements.pgn_text;
   const pasteCount = document.querySelector("[data-paste-count]");
@@ -86,6 +146,8 @@ if (form) {
       liveRoot.querySelector("[data-source-name]").textContent = "Loading batch…";
       liveRoot.querySelector("[data-connection] span").textContent = "Connecting to live analysis";
       liveController = mountLiveAnalysis(liveRoot, body.job.id);
+      form.classList.remove("is-submitting");
+      form.querySelector("button[type=submit]").disabled = false;
       liveRoot.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
         block: "start",

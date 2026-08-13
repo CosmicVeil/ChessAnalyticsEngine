@@ -20,6 +20,31 @@ export function jobConnectionState(status) {
   };
 }
 
+export function validateScoreRange(values) {
+  const minimum = parseScoreBound(values.get("score_min"), "Minimum");
+  if (minimum.error) return minimum.error;
+  const maximum = parseScoreBound(values.get("score_max"), "Maximum");
+  if (maximum.error) return maximum.error;
+  if (minimum.value !== null && maximum.value !== null && minimum.value > maximum.value) {
+    return "Minimum score cannot exceed maximum score.";
+  }
+  return null;
+}
+
+function parseScoreBound(rawValue, label) {
+  const raw = String(rawValue ?? "").trim();
+  if (raw === "") return { value: null, error: null };
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    return { value: null, error: `${label} score must be a number between zero and one.` };
+  }
+  return { value, error: null };
+}
+
+export function eventStreamUrl(jobId, eventCursor) {
+  return `/api/analyses/${jobId}/events?after=${eventCursor}`;
+}
+
 export function createLoadArbiter() {
   let latestLoadId = 0;
   let liveRevision = 0;
@@ -29,6 +54,9 @@ export function createLoadArbiter() {
     beginLoad() {
       return Object.freeze({ id: ++latestLoadId, liveRevision });
     },
+    invalidate() {
+      latestLoadId += 1;
+    },
     isCurrent(load) {
       return load.id === latestLoadId;
     },
@@ -37,6 +65,11 @@ export function createLoadArbiter() {
     },
     canApplyGame(load, gameId) {
       return load.id === latestLoadId
+        && (liveGameRevisions.get(gameId) ?? 0) <= load.liveRevision;
+    },
+    canRemoveGame(load, gameId, fetchedIds) {
+      return load.id === latestLoadId
+        && !fetchedIds.has(gameId)
         && (liveGameRevisions.get(gameId) ?? 0) <= load.liveRevision;
     },
   };
@@ -52,6 +85,7 @@ export function mountLiveAnalysis(root, jobId) {
   const empty = root.querySelector("[data-empty]");
   const connection = root.querySelector("[data-connection]");
   const filters = root.querySelector("[data-filters]");
+  const filterStatus = root.querySelector("[data-filter-status]");
   const loadMore = root.querySelector("[data-load-more]");
   const cards = new Map();
   const loadArbiter = createLoadArbiter();
@@ -110,42 +144,81 @@ export function mountLiveAnalysis(root, jobId) {
 
   async function loadStatus() {
     const response = await fetch(`/api/analyses/${jobId}`);
-    if (!response.ok) throw new Error("Analysis job not found");
+    if (!response.ok) throw new Error(await apiErrorMessage(response, "Analysis job not found"));
     const body = await response.json();
-    if (closed) return;
+    if (closed) return 0;
     updateJob(body.job);
+    return Number.isInteger(body.event_cursor) && body.event_cursor >= 0
+      ? body.event_cursor
+      : 0;
   }
 
   async function loadGames(reset = false) {
     const load = loadArbiter.beginLoad();
-    if (reset) { cards.clear(); ledger.replaceChildren(); nextCursor = null; }
-    const params = new URLSearchParams(new FormData(filters));
+    const filterValues = new FormData(filters);
+    const validationError = validateScoreRange(filterValues);
+    if (validationError) {
+      if (loadArbiter.isCurrent(load)) {
+        ledger.setAttribute("aria-busy", "false");
+        filterStatus.textContent = validationError;
+      }
+      return false;
+    }
+    ledger.setAttribute("aria-busy", "true");
+    filterStatus.textContent = "";
+    const params = new URLSearchParams(filterValues);
     params.set("limit", "50");
-    if (nextCursor) params.set("cursor", nextCursor);
-    const response = await fetch(`/api/analyses/${jobId}/games?${params}`);
-    if (!response.ok || closed || !loadArbiter.isCurrent(load)) return;
-    const page = await response.json();
-    if (closed || !loadArbiter.isCurrent(load)) return;
-    page.items.forEach((game) => {
-      if (loadArbiter.canApplyGame(load, game.id)) upsertGame(game);
-    });
-    nextCursor = page.next_cursor;
-    loadMore.hidden = !page.has_more;
-    ledger.setAttribute("aria-busy", "false");
-    empty.hidden = cards.size > 0;
+    if (!reset && nextCursor) params.set("cursor", nextCursor);
+    try {
+      const response = await fetch(`/api/analyses/${jobId}/games?${params}`);
+      if (!response.ok) {
+        throw new Error(await apiErrorMessage(response, "Games could not be loaded."));
+      }
+      const page = await response.json();
+      if (closed || !loadArbiter.isCurrent(load)) return false;
+      const fetchedIds = new Set(page.items.map((game) => game.id));
+      page.items.forEach((game) => {
+        if (loadArbiter.canApplyGame(load, game.id)) upsertGame(game);
+      });
+      if (reset) {
+        for (const [gameId, card] of cards) {
+          if (!loadArbiter.canRemoveGame(load, gameId, fetchedIds)) continue;
+          card.remove();
+          cards.delete(gameId);
+        }
+      }
+      nextCursor = page.next_cursor;
+      loadMore.hidden = !page.has_more;
+      cards.forEach(applyVisibility);
+      ledger.setAttribute("aria-busy", "false");
+      filterStatus.textContent = "";
+      empty.hidden = cards.size > 0;
+      return true;
+    } catch (error) {
+      if (!closed && loadArbiter.isCurrent(load)) {
+        ledger.setAttribute("aria-busy", "false");
+        filterStatus.textContent = error.message;
+      }
+      return false;
+    }
   }
 
-  const handleFilterChange = () => loadGames(true);
-  const handleFilterInput = () => cards.forEach(applyVisibility);
-  const handleLoadMore = () => loadGames();
+  const handleFilterChange = () => { void loadGames(true); };
+  const handleFilterInput = () => {
+    loadArbiter.invalidate();
+    ledger.setAttribute("aria-busy", "false");
+    filterStatus.textContent = validateScoreRange(new FormData(filters)) || "";
+  };
+  const handleLoadMore = () => { void loadGames(); };
 
   filters.addEventListener("change", handleFilterChange);
   filters.addEventListener("input", handleFilterInput);
   loadMore.addEventListener("click", handleLoadMore);
 
-  Promise.all([loadStatus(), loadGames(true)]).then(() => {
-    if (closed || renderJobConnection().terminal) return;
-    eventSource = new EventSource(`/api/analyses/${jobId}/events`);
+  loadStatus().then(async (eventCursor) => {
+    const gamesLoaded = await loadGames(true);
+    if (!gamesLoaded || closed || renderJobConnection().terminal) return;
+    eventSource = new EventSource(eventStreamUrl(jobId, eventCursor));
     eventSource.addEventListener("open", () => renderJobConnection());
     eventSource.addEventListener("error", () => {
       if (jobConnectionState(latestJobStatus).terminal) {
@@ -164,6 +237,8 @@ export function mountLiveAnalysis(root, jobId) {
     });
   }).catch((error) => {
     if (closed) return;
+    ledger.setAttribute("aria-busy", "false");
+    filterStatus.textContent = error.message;
     connection.classList.add("is-offline");
     connection.querySelector("span").textContent = error.message;
   });
@@ -192,6 +267,15 @@ export function mountLiveAnalysis(root, jobId) {
   };
   mountedControllers.set(root, controller);
   return controller;
+}
+
+async function apiErrorMessage(response, fallback) {
+  try {
+    const body = await response.json();
+    return body.error?.message || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 const root = document.querySelector("[data-job-id]");

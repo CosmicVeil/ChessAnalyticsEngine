@@ -218,6 +218,12 @@ class FakeStoreContractTests(unittest.TestCase):
             [event.event_type for event in store.events_after(job.id, 0, 10)],
             ["job.updated", "job.updated"],
         )
+        self.assertEqual(store.latest_event_id(job.id), store.events[-1].id)
+
+    def test_fake_latest_event_cursor_is_zero_without_job_events(self) -> None:
+        store = FakeAnalysisStore()
+
+        self.assertEqual(store.latest_event_id(uuid.uuid4()), 0)
 
     def test_completed_game_is_visible_live_before_ingestion_reaches_eof(
         self,

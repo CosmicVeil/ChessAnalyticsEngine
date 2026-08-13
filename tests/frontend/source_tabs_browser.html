@@ -22,6 +22,7 @@
       import { mountSourceTabs } from "../../webapp/static/js/analyze.js?browser-test=1";
 
       const fixture = document.querySelector("#fixture");
+      const tablist = fixture.querySelector("[role=tablist]");
       const tabs = [...fixture.querySelectorAll("[data-mode-button]")];
       const panels = [...fixture.querySelectorAll("[data-mode-panel]")];
       const failures = [];
@@ -29,8 +30,21 @@
       const press = (tab, key) => tab.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
       const activeMode = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.dataset.modeButton;
       const visibleMode = () => panels.find((panel) => !panel.hidden)?.dataset.modePanel;
+      const mediaListeners = new Set();
+      const mobileQuery = {
+        matches: false,
+        addEventListener(type, listener) { if (type === "change") mediaListeners.add(listener); },
+        removeEventListener(type, listener) { if (type === "change") mediaListeners.delete(listener); },
+        setMatches(matches) {
+          this.matches = matches;
+          for (const listener of mediaListeners) listener({ matches });
+        },
+      };
 
-      mountSourceTabs(fixture);
+      const controller = mountSourceTabs(fixture, mobileQuery);
+      check(tablist.getAttribute("aria-orientation") === "horizontal", "desktop tablist orientation is not horizontal");
+      press(tabs[0], "ArrowDown");
+      check(activeMode() === "file", "desktop tabs accepted a vertical arrow");
       press(tabs[0], "ArrowRight");
       check(activeMode() === "paste" && visibleMode() === "paste", "ArrowRight did not select Paste");
       check(document.activeElement === tabs[1], "ArrowRight did not move focus");
@@ -42,6 +56,22 @@
       check(activeMode() === "file" && document.activeElement === tabs[0], "Home did not select Upload");
       press(tabs[0], "End");
       check(activeMode() === "lichess" && document.activeElement === tabs[2], "End did not select Lichess");
+
+      press(tabs[2], "Home");
+      mobileQuery.setMatches(true);
+      check(tablist.getAttribute("aria-orientation") === "vertical", "mobile tablist orientation is not vertical");
+      press(tabs[0], "ArrowRight");
+      check(activeMode() === "file", "mobile tabs accepted a horizontal arrow");
+      press(tabs[0], "ArrowDown");
+      check(activeMode() === "paste" && visibleMode() === "paste", "ArrowDown did not select Paste on mobile");
+      press(tabs[1], "ArrowUp");
+      check(activeMode() === "file" && document.activeElement === tabs[0], "ArrowUp did not select Upload on mobile");
+      press(tabs[0], "ArrowUp");
+      check(activeMode() === "lichess", "ArrowUp did not wrap to Lichess on mobile");
+
+      controller.close();
+      mobileQuery.setMatches(false);
+      check(tablist.getAttribute("aria-orientation") === "vertical", "closed tab controller retained its media-query listener");
 
       document.querySelector("#report").textContent = failures.join("\n") || "PASS";
       document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";

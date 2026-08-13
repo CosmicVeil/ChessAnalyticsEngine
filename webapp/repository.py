@@ -373,6 +373,13 @@ class SqlAlchemyAnalysisStore:
             job = session.get(AnalysisJob, job_id)
             return None if job is None else _job_snapshot(job)
 
+    def latest_event_id(self, job_id: uuid.UUID) -> int:
+        statement = sa.select(sa.func.max(JobEvent.id)).where(
+            JobEvent.job_id == job_id
+        )
+        with self._sessions() as session:
+            return int(session.scalar(statement) or 0)
+
     def list_games(
         self, job_id: uuid.UUID, query: GameQuery
     ) -> Page[GameSnapshot]:

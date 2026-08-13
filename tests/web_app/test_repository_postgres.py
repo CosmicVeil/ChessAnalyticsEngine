@@ -147,6 +147,8 @@ class RepositoryPostgresTests(unittest.TestCase):
         self.assertEqual(events[0].event_type, "job.updated")
         self.assertEqual(events[0].payload, {"job": job.to_view()})
         self.assertNotIn("spool_path", events[0].payload["job"])
+        self.assertEqual(self.store.latest_event_id(job.id), events[0].id)
+        self.assertEqual(self.store.latest_event_id(uuid.uuid4()), 0)
 
     def test_claim_skips_a_locked_oldest_job(self) -> None:
         first = self.store.create_queued_job(self.source("first.pgn"))
@@ -424,6 +426,7 @@ class RepositoryPostgresTests(unittest.TestCase):
             {event.event_type for event in all_events},
             {"job.updated", "game.updated"},
         )
+        self.assertEqual(self.store.latest_event_id(job.id), all_events[-1].id)
 
     def test_unmatched_result_source_coordinates_are_idempotent(self) -> None:
         message = FakeKafkaMessage()

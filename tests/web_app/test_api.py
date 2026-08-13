@@ -3,6 +3,7 @@
 import io
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 from tests.web_app.fakes import FakeAnalysisStore
@@ -92,7 +93,14 @@ class ApiTests(unittest.TestCase):
         created = self.client.post("/api/analyses", data={"pgn_text": PGN}).get_json()
         job_id = created["job"]["id"]
 
-        self.assertEqual(self.client.get(f"/api/analyses/{job_id}").status_code, 200)
+        status_response = self.client.get(f"/api/analyses/{job_id}")
+        self.assertEqual(status_response.status_code, 200)
+        status_body = status_response.get_json()
+        self.assertEqual(set(status_body), {"job", "event_cursor"})
+        self.assertEqual(
+            status_body["event_cursor"],
+            self.store.latest_event_id(uuid.UUID(job_id)),
+        )
         games = self.client.get(
             f"/api/analyses/{job_id}/games?status=queued&agreement=all&limit=500"
         )

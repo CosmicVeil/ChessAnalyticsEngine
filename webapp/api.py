@@ -98,12 +98,13 @@ def create_analysis():
 @api.get("/analyses/<uuid:job_id>")
 def get_analysis(job_id: uuid.UUID):
     try:
+        event_cursor = _dependencies().store.latest_event_id(job_id)
         job = _dependencies().store.get_job(job_id)
     except Exception:
         return _error("database_unavailable", "PostgreSQL is unavailable.", 503)
     if job is None:
         return _error("job_not_found", "Analysis job was not found.", 404)
-    return jsonify({"job": job.to_view()})
+    return jsonify({"job": job.to_view(), "event_cursor": event_cursor})
 
 
 @api.get("/analyses/<uuid:job_id>/games")

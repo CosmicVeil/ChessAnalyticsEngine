@@ -28,12 +28,12 @@ Flask, the PGN ingestion worker, and the result worker run as three independent 
 
 ## What the web application provides
 
-- A combined upload and live-results Home with an editorial, animated presentation, layered chess-piece motion, and qualified local benchmark figures.
+- A combined upload and live-results Home with an editorial, animated presentation and layered chess-piece motion.
 - PGN file upload and pasted PGN submission. The Lichess Study control is present but deliberately returns `501 connector_unavailable` until its connector is implemented.
 - Streaming PGN parsing with bounded private disk spooling instead of loading a large upload into memory.
 - Per-game state and separate PyTorch/XGBoost scores, rendered in original PGN order as results arrive.
 - Status, agreement, and score-range filtering with cursor pagination.
-- Resumable Server-Sent Events backed by PostgreSQL event rows. Reconnecting with `Last-Event-ID` does not lose finished games.
+- Resumable Server-Sent Events backed by PostgreSQL event rows. Job status includes an additive `event_cursor`; the browser loads the initial game snapshot, then opens the stream with `?after=<event_cursor>` so restoring a large active job skips replayed history without missing later events. Reconnecting with `Last-Event-ID` remains supported.
 - Reduced-motion support, keyboard focus states, responsive layouts, and true-alpha PNG piece assets.
 
 Anonymous job IDs are unguessable UUIDs, but this release has no accounts or authorization. Add access control before accepting private games on a public deployment.
@@ -102,6 +102,8 @@ The topic topology and process isolation remain intact. Changes to the existing 
 6. `live_pipeline.py` is an additive supervisor for the four existing Python core workers. It imports no model or Flask code, and it stops the remaining workers if one exits so a partially running pipeline is visible immediately.
 
 The web layer also adds PostgreSQL, Alembic migrations, private PGN spooling, durable job events, and idempotent result storage. These additions adapt the pipeline for browser workloads without moving feature extraction or inference into Flask. The frontend presentation work changes neither feature extraction nor model inference.
+
+The job-status response now carries top-level `event_cursor` resume metadata alongside `job`. This is an additive web-adapter/API contract: it reads the existing durable event IDs and changes no database schema, Kafka contract, feature pipeline, or inference process.
 
 ## Local setup
 
@@ -180,7 +182,7 @@ cd ml-model
 | `GET /analyses/<job_id>` | Restorable Home state for a specific job |
 | `GET /system` | Information page |
 | `POST /api/analyses` | Create a file or paste analysis job |
-| `GET /api/analyses/<job_id>` | Job snapshot and counters |
+| `GET /api/analyses/<job_id>` | Job snapshot, counters, and additive SSE `event_cursor` resume metadata |
 | `GET /api/analyses/<job_id>/games` | Filtered, paginated game results |
 | `GET /api/analyses/<job_id>/events` | Durable SSE updates |
 | `GET /api/health` | Web, PostgreSQL, and Kafka health |

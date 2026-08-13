@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-test-status="running">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live analysis browser test</title>
+  </head>
+  <body>
+    <main data-job-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">
+      <h1 data-source-name>Loading</h1>
+      <div data-connection><span>Connecting</span></div>
+      <strong data-count-key="total">0</strong>
+      <strong data-count-key="queued">0</strong>
+      <strong data-count-key="analyzing">0</strong>
+      <strong data-count-key="completed">0</strong>
+      <strong data-count-key="failed">0</strong>
+      <i data-progress></i>
+      <form data-filters>
+        <select name="status"><option value="all">All</option></select>
+        <select name="agreement"><option value="all">All</option></select>
+        <input name="score_min">
+        <input name="score_max">
+      </form>
+      <output data-filter-status aria-live="polite"></output>
+      <div data-game-ledger aria-busy="true"></div>
+      <button type="button" data-load-more hidden>More</button>
+      <p data-empty>Empty</p>
+    </main>
+    <pre id="report"></pre>
+    <script type="module">
+      const failures = [];
+      const check = (condition, message) => { if (!condition) failures.push(message); };
+      const game = (id, sequence, white = id) => ({
+        id,
+        sequence,
+        status: "completed",
+        white: { name: white, elo: 1800 },
+        black: { name: "Opponent", elo: 1790 },
+        opening: "Fixture opening",
+        result: "1-0",
+        played_at: "2026-08-13T12:00:00+00:00",
+        error: null,
+        scores: {
+          pytorch: { score: 0.8, prediction: true },
+          xgboost: { score: 0.7, prediction: true },
+          agreement: true,
+        },
+      });
+      const job = {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        source_name: "fixture.pgn",
+        status: "live",
+        counts: { total: 3, queued: 0, analyzing: 1, completed: 2, failed: 0 },
+      };
+      const oldGame = game("old", 1, "Original");
+      const staleGame = game("stale", 2, "Stale");
+      let gameRequestCount = 0;
+      let nextGamesResponse = null;
+      let resolveRace;
+      window.matchMedia = () => ({ matches: true });
+      window.fetch = async (url) => {
+        if (!String(url).includes("/games?")) {
+          return new Response(JSON.stringify({ job, event_cursor: 12 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        gameRequestCount += 1;
+        if (nextGamesResponse === "error") {
+          nextGamesResponse = null;
+          return new Response(JSON.stringify({ error: { message: "Filter service unavailable." } }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (nextGamesResponse === "race") {
+          nextGamesResponse = null;
+          return new Promise((resolve) => { resolveRace = resolve; });
+        }
+        return new Response(JSON.stringify({ items: [oldGame, staleGame], next_cursor: null, has_more: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+      const sources = [];
+      window.EventSource = class {
+        constructor(url) {
+          this.url = url;
+          this.listeners = new Map();
+          sources.push(this);
+        }
+        addEventListener(type, listener) { this.listeners.set(type, listener); }
+        emit(type, payload) { this.listeners.get(type)?.({ data: JSON.stringify(payload) }); }
+        close() {}
+      };
+      const waitFor = async (predicate) => {
+        for (let index = 0; index < 60 && !predicate(); index += 1) {
+          await new Promise(requestAnimationFrame);
+        }
+      };
+
+      await import("../../webapp/static/js/analysis.js?browser-test=6");
+      const root = document.querySelector("[data-job-id]");
+      const filters = root.querySelector("[data-filters]");
+      const ledger = root.querySelector("[data-game-ledger]");
+      const filterStatus = root.querySelector("[data-filter-status]");
+      await waitFor(() => sources.length === 1 && ledger.children.length === 2);
+
+      check(sources[0]?.url.endsWith("/events?after=12"), "EventSource did not resume after the status cursor");
+      check(ledger.children.length === 2, "initial game snapshot did not render");
+
+      filters.elements.score_min.value = "0.9";
+      filters.elements.score_max.value = "0.2";
+      const requestsBeforeInvalid = gameRequestCount;
+      filters.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise(requestAnimationFrame);
+      check(gameRequestCount === requestsBeforeInvalid, "invalid range reached the API");
+      check(ledger.children.length === 2, "invalid range cleared the current ledger");
+      check(filterStatus.textContent.includes("cannot exceed"), "invalid range was not announced");
+      check(ledger.getAttribute("aria-busy") === "false", "invalid range left the ledger busy");
+
+      filters.elements.score_min.value = "0.2";
+      filters.elements.score_max.value = "0.9";
+      nextGamesResponse = "error";
+      filters.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => filterStatus.textContent.includes("unavailable"));
+      check(ledger.children.length === 2, "API error cleared the current ledger");
+      check(ledger.getAttribute("aria-busy") === "false", "API error left the ledger busy");
+
+      nextGamesResponse = "race";
+      filters.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => typeof resolveRace === "function");
+      const liveGame = game("live", 3, "Live arrival");
+      sources[0].emit("game.updated", { job, game: liveGame });
+      resolveRace(new Response(JSON.stringify({ items: [oldGame], next_cursor: null, has_more: false }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+      await waitFor(() => ledger.getAttribute("aria-busy") === "false");
+      check(ledger.children.length === 2, "successful reset did not reconcile stale and live cards");
+      check(ledger.textContent.includes("Original"), "successful reset removed a fetched card");
+      check(ledger.textContent.includes("Live arrival"), "successful reset removed an SSE card received during the request");
+      check(!ledger.textContent.includes("Stale"), "successful reset retained a stale unfetched card");
+
+      document.querySelector("#report").textContent = failures.join("\n") || "PASS";
+      document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";
+    </script>
+  </body>
+</html>

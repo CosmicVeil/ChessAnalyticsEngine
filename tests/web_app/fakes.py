@@ -295,6 +295,12 @@ class FakeAnalysisStore:
     def get_job(self, job_id: uuid.UUID) -> JobSnapshot | None:
         return self.jobs.get(job_id)
 
+    def latest_event_id(self, job_id: uuid.UUID) -> int:
+        return max(
+            (event.id for event in self.events if event.job_id == job_id),
+            default=0,
+        )
+
     def list_games(
         self, job_id: uuid.UUID, query: GameQuery
     ) -> Page[GameSnapshot]:

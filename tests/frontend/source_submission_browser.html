@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-test-status="running">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Source submission browser test</title>
+  </head>
+  <body>
+    <main>
+      <div role="tablist" aria-label="PGN source">
+        <button type="button" role="tab" aria-selected="true" data-mode-button="file">Upload PGN</button>
+      </div>
+      <form data-analysis-form>
+        <section data-mode-panel="file">
+          <label data-drop-zone>
+            <input type="file" name="pgn_file" accept=".pgn,application/x-chess-pgn,text/plain">
+            <strong data-file-label>Drop a batch file here</strong>
+          </label>
+        </section>
+        <textarea name="pgn_text"></textarea>
+        <input name="lichess_url">
+        <button type="submit">Queue analysis</button>
+        <output data-form-status></output>
+      </form>
+      <section data-live-results hidden aria-labelledby="results-title">
+        <span data-job-short></span>
+        <h2 id="results-title" data-source-name></h2>
+        <div data-connection><span></span></div>
+        <strong data-count-key="total">0</strong>
+        <strong data-count-key="queued">0</strong>
+        <strong data-count-key="analyzing">0</strong>
+        <strong data-count-key="completed">0</strong>
+        <strong data-count-key="failed">0</strong>
+        <i data-progress></i>
+        <form data-filters>
+          <select name="status"><option value="all">All</option></select>
+          <select name="agreement"><option value="all">All</option></select>
+          <input name="score_min">
+          <input name="score_max">
+        </form>
+        <output data-filter-status aria-live="polite"></output>
+        <div data-game-ledger></div>
+        <button type="button" data-load-more hidden>More</button>
+        <p data-empty></p>
+      </section>
+    </main>
+    <pre id="report"></pre>
+    <script type="module">
+      const failures = [];
+      const check = (condition, message) => { if (!condition) failures.push(message); };
+      const jobId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const job = {
+        id: jobId,
+        source_name: "dropped.pgn",
+        status: "queued",
+        counts: { total: 0, queued: 0, analyzing: 0, completed: 0, failed: 0 },
+      };
+      const requests = [];
+      window.fetch = async (url, options = {}) => {
+        requests.push({ url: String(url), options });
+        if (options.method === "POST") {
+          return new Response(JSON.stringify({
+            job,
+            links: { page: `/analyses/${jobId}` },
+          }), { status: 202, headers: { "Content-Type": "application/json" } });
+        }
+        if (String(url).includes("/games?")) {
+          return new Response(JSON.stringify({ items: [], next_cursor: null, has_more: false }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ job, event_cursor: 7 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      };
+      const eventSources = [];
+      window.EventSource = class {
+        constructor(url) { this.url = url; eventSources.push(this); }
+        addEventListener() {}
+        close() {}
+      };
+      window.matchMedia = () => ({
+        matches: false,
+        addEventListener() {},
+        removeEventListener() {},
+      });
+
+      await import("../../webapp/static/js/analyze.js?browser-test=2");
+
+      const form = document.querySelector("[data-analysis-form]");
+      const input = form.elements.pgn_file;
+      const dropZone = document.querySelector("[data-drop-zone]");
+      const status = document.querySelector("[data-form-status]");
+      const label = document.querySelector("[data-file-label]");
+
+      const invalidTransfer = new DataTransfer();
+      invalidTransfer.items.add(new File(["notes"], "notes.txt", { type: "text/plain" }));
+      const invalidDrop = new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: invalidTransfer,
+      });
+      dropZone.dispatchEvent(invalidDrop);
+      check(invalidDrop.defaultPrevented, "invalid drop did not prevent browser navigation");
+      check(input.files.length === 0, "invalid drop replaced the native file input");
+      check(status.textContent.includes("PGN"), "invalid drop did not expose a PGN validation message");
+
+      const validTransfer = new DataTransfer();
+      validTransfer.items.add(new File(["[Event \"Fixture\"]\n\n1. e4 e5 *"], "dropped.pgn", { type: "text/plain" }));
+      const dragOver = new DragEvent("dragover", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: validTransfer,
+      });
+      dropZone.dispatchEvent(dragOver);
+      check(dragOver.defaultPrevented, "dragover did not opt into a drop target");
+      check(dropZone.classList.contains("is-dragging"), "dragover did not show the drop state");
+      const validDrop = new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: validTransfer,
+      });
+      dropZone.dispatchEvent(validDrop);
+      check(validDrop.defaultPrevented, "valid drop did not prevent browser navigation");
+      check(!dropZone.classList.contains("is-dragging"), "drop state remained after drop");
+      check(input.files.length === 1 && input.files[0].name === "dropped.pgn", "dropped PGN did not populate the native file input");
+      check(label.textContent.includes("dropped.pgn"), "dropped PGN did not update the file label");
+      check(status.textContent === "", "valid drop did not clear the validation message");
+
+      form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
+      for (let index = 0; index < 20 && form.classList.contains("is-submitting"); index += 1) {
+        await new Promise(requestAnimationFrame);
+      }
+      check(requests.some(({ options }) => options.method === "POST"), "dropped PGN was not submitted");
+      check(!form.classList.contains("is-submitting"), "successful submission left the form busy");
+      check(!form.querySelector("button[type=submit]").disabled, "successful submission left the button disabled");
+      check(document.querySelector("[data-live-results]").dataset.jobId === jobId, "successful submission did not mount the returned job");
+      for (let index = 0; index < 20 && eventSources.length === 0; index += 1) {
+        await new Promise(requestAnimationFrame);
+      }
+      check(eventSources[0]?.url.endsWith("/events?after=7"), "successful submission did not resume after the status cursor");
+
+      document.querySelector("#report").textContent = failures.join("\n") || "PASS";
+      document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";
+    </script>
+  </body>
+</html>
