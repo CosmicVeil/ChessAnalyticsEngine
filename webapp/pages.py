@@ -2,7 +2,7 @@
 
 import uuid
 
-from flask import Blueprint, render_template
+from flask import Blueprint, redirect, render_template, url_for
 
 
 pages = Blueprint("pages", __name__)
@@ -10,17 +10,17 @@ pages = Blueprint("pages", __name__)
 
 @pages.get("/")
 def landing():
-    return render_template("landing.html")
+    return render_template("landing.html", job_id=None)
 
 
 @pages.get("/analyze")
 def analyze():
-    return render_template("analyze.html")
+    return redirect(url_for("pages.landing"))
 
 
 @pages.get("/analyses/<uuid:job_id>")
 def analysis(job_id: uuid.UUID):
-    return render_template("analysis.html", job_id=job_id)
+    return render_template("landing.html", job_id=job_id)
 
 
 @pages.get("/system")

@@ -28,13 +28,32 @@ class FrontendPageTests(unittest.TestCase):
         cls.client = cls.app.test_client()
 
     def test_all_creative_pages_render_without_model_imports(self):
-        paths = ["/", "/analyze", "/system", f"/analyses/{uuid.uuid4()}"]
+        paths = ["/", "/system", f"/analyses/{uuid.uuid4()}"]
         for path in paths:
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertEqual(response.status_code, 200)
                 self.assertIn(b"Chess Analytics Engine", response.data)
                 self.assertIn(b"/static/css/site.css", response.data)
+
+    def test_analyze_redirects_to_home(self):
+        response = self.client.get("/analyze", follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/")
+
+    def test_home_shell_preserves_sources_and_restores_a_selected_job(self):
+        job_id = uuid.uuid4()
+        home = self.client.get("/")
+        analysis = self.client.get(f"/analyses/{job_id}")
+
+        for response in (home, analysis):
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"data-home-shell", response.data)
+            self.assertIn(b'name="pgn_file"', response.data)
+            self.assertIn(b'name="pgn_text"', response.data)
+            self.assertIn(b'name="lichess_url"', response.data)
+        self.assertIn(f'data-job-id="{job_id}"'.encode(), analysis.data)
 
     def test_visual_system_avoids_disallowed_design_shortcuts(self):
         css = (ROOT / "webapp/static/css/site.css").read_text(encoding="utf-8").lower()
@@ -43,7 +62,7 @@ class FrontendPageTests(unittest.TestCase):
         landing = self.client.get("/").data
         self.assertIn(b"data-depth", landing)
         self.assertIn(b"assets/knight.png", landing)
-        self.assertIn(b"local benchmark", landing.lower())
+        self.assertIn(b"live model scores from your", landing.lower())
 
     def test_piece_assets_are_rgba_pngs_with_isolated_alpha(self):
         for name in ("knight.png", "rook.png", "bishop.png"):

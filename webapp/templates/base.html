@@ -16,9 +16,9 @@
       <span class="brand-mark">CÆ</span><span class="brand-index">/ 01</span>
     </a>
     <nav aria-label="Primary navigation">
-      <a href="{{ url_for('pages.analyze') }}">Analyze</a>
-      <a href="{{ url_for('pages.system') }}">System</a>
-      <span class="nav-signal" aria-hidden="true"></span>
+      <a href="{{ url_for('pages.landing') }}"{% if request.endpoint in ('pages.landing', 'pages.analysis') %} aria-current="page"{% endif %}>Home</a>
+      <a href="{{ url_for('pages.system') }}"{% if request.endpoint == 'pages.system' %} aria-current="page"{% endif %}>Information</a>
+      <a href="https://github.com/CosmicVeil/ChessAnalyticsEngine" target="_blank" rel="noreferrer">GitHub</a>
     </nav>
   </header>
   <main id="main">{% block content %}{% endblock %}</main>
