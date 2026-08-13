@@ -13,6 +13,7 @@
       import {
         buildCard,
         jobConnectionState,
+        mountLiveAnalysis,
       } from "../../webapp/static/js/analysis.js?browser-test=5";
 
       const game = {
@@ -33,6 +34,7 @@
       };
       const failures = [];
       const check = (condition, message) => { if (!condition) failures.push(message); };
+      check(typeof mountLiveAnalysis === "function", "live analysis controller export missing");
       check(jobConnectionState("parsing").label === "Reading PGN", "parsing copy missing");
       check(jobConnectionState("live").label === "Live analysis", "live copy missing");
       check(jobConnectionState("analyzing").label === "Live analysis", "legacy copy missing");

@@ -20,18 +20,22 @@ export function jobConnectionState(status) {
   };
 }
 
-const root = document.querySelector("[data-job-id]");
-if (root) {
-  const jobId = root.dataset.jobId;
-  const ledger = document.querySelector("[data-game-ledger]");
-  const empty = document.querySelector("[data-empty]");
-  const connection = document.querySelector("[data-connection]");
-  const filters = document.querySelector("[data-filters]");
-  const loadMore = document.querySelector("[data-load-more]");
+const mountedControllers = new WeakMap();
+
+export function mountLiveAnalysis(root, jobId) {
+  mountedControllers.get(root)?.close();
+
+  root.dataset.jobId = jobId;
+  const ledger = root.querySelector("[data-game-ledger]");
+  const empty = root.querySelector("[data-empty]");
+  const connection = root.querySelector("[data-connection]");
+  const filters = root.querySelector("[data-filters]");
+  const loadMore = root.querySelector("[data-load-more]");
   const cards = new Map();
   let nextCursor = null;
   let eventSource;
   let latestJobStatus = "queued";
+  let closed = false;
 
   function renderJobConnection(status = latestJobStatus) {
     const state = jobConnectionState(status);
@@ -42,13 +46,13 @@ if (root) {
 
   function updateJob(job) {
     latestJobStatus = job.status;
-    document.querySelector("[data-source-name]").textContent = job.source_name;
+    root.querySelector("[data-source-name]").textContent = job.source_name;
     for (const [key, value] of Object.entries(job.counts)) {
-      const target = document.querySelector(`[data-count-key="${key}"]`);
+      const target = root.querySelector(`[data-count-key="${key}"]`);
       if (target) rollNumber(target, Number(target.textContent.replace(/\D/g, "")) || 0, value);
     }
     const terminal = job.counts.completed + job.counts.failed;
-    document.querySelector("[data-progress]").style.transform = `scaleX(${job.counts.total ? terminal / job.counts.total : 0})`;
+    root.querySelector("[data-progress]").style.transform = `scaleX(${job.counts.total ? terminal / job.counts.total : 0})`;
     const connectionState = renderJobConnection();
     if (connectionState.terminal) {
       eventSource?.close();
@@ -84,7 +88,9 @@ if (root) {
   async function loadStatus() {
     const response = await fetch(`/api/analyses/${jobId}`);
     if (!response.ok) throw new Error("Analysis job not found");
-    updateJob((await response.json()).job);
+    const body = await response.json();
+    if (closed) return;
+    updateJob(body.job);
   }
 
   async function loadGames(reset = false) {
@@ -93,8 +99,9 @@ if (root) {
     params.set("limit", "50");
     if (nextCursor) params.set("cursor", nextCursor);
     const response = await fetch(`/api/analyses/${jobId}/games?${params}`);
-    if (!response.ok) return;
+    if (!response.ok || closed) return;
     const page = await response.json();
+    if (closed) return;
     page.items.forEach(upsertGame);
     nextCursor = page.next_cursor;
     loadMore.hidden = !page.has_more;
@@ -102,12 +109,16 @@ if (root) {
     empty.hidden = cards.size > 0;
   }
 
-  filters.addEventListener("change", () => loadGames(true));
-  filters.addEventListener("input", () => cards.forEach(applyVisibility));
-  loadMore.addEventListener("click", () => loadGames());
+  const handleFilterChange = () => loadGames(true);
+  const handleFilterInput = () => cards.forEach(applyVisibility);
+  const handleLoadMore = () => loadGames();
+
+  filters.addEventListener("change", handleFilterChange);
+  filters.addEventListener("input", handleFilterInput);
+  loadMore.addEventListener("click", handleLoadMore);
 
   Promise.all([loadStatus(), loadGames(true)]).then(() => {
-    if (renderJobConnection().terminal) return;
+    if (closed || renderJobConnection().terminal) return;
     eventSource = new EventSource(`/api/analyses/${jobId}/events`);
     eventSource.addEventListener("open", () => renderJobConnection());
     eventSource.addEventListener("error", () => {
@@ -125,6 +136,7 @@ if (root) {
       upsertGame(payload.game);
     });
   }).catch((error) => {
+    if (closed) return;
     connection.classList.add("is-offline");
     connection.querySelector("span").textContent = error.message;
   });
@@ -139,7 +151,24 @@ if (root) {
     };
     requestAnimationFrame(tick);
   }
+
+  const controller = {
+    close() {
+      if (closed) return;
+      closed = true;
+      eventSource?.close();
+      filters.removeEventListener("change", handleFilterChange);
+      filters.removeEventListener("input", handleFilterInput);
+      loadMore.removeEventListener("click", handleLoadMore);
+      if (mountedControllers.get(root) === controller) mountedControllers.delete(root);
+    },
+  };
+  mountedControllers.set(root, controller);
+  return controller;
 }
+
+const root = document.querySelector("[data-job-id]");
+if (root?.dataset.jobId) mountLiveAnalysis(root, root.dataset.jobId);
 
 export function buildCard(game, existing) {
   const detailWasOpen = existing?.querySelector("details.game-detail")?.open ?? false;

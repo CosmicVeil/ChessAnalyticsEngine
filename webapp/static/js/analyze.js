@@ -1,3 +1,5 @@
+import { mountLiveAnalysis } from "./analysis.js";
+
 export function mountSourceTabs(root = document) {
   const buttons = [...root.querySelectorAll("[data-mode-button]")];
   const panels = [...root.querySelectorAll("[data-mode-panel]")];
@@ -44,6 +46,8 @@ const form = document.querySelector("[data-analysis-form]");
 if (form) {
   const sourceTabs = mountSourceTabs();
   const status = document.querySelector("[data-form-status]");
+  const liveRoot = document.querySelector("[data-live-results]");
+  let liveController;
 
   const fileInput = form.elements.pgn_file;
   const fileLabel = document.querySelector("[data-file-label]");
@@ -73,8 +77,19 @@ if (form) {
       const response = await fetch("/api/analyses", { method: "POST", body: data });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message || "The source was not accepted.");
-      status.textContent = "Accepted. Moving to the live ledger…";
-      window.location.assign(body.links.page);
+      status.textContent = "Accepted. Opening the live ledger…";
+      liveController?.close();
+      liveRoot.dataset.jobId = body.job.id;
+      history.pushState({}, "", body.links.page);
+      liveRoot.hidden = false;
+      liveRoot.querySelector("[data-job-short]").textContent = body.job.id.slice(0, 8);
+      liveRoot.querySelector("[data-source-name]").textContent = "Loading batch…";
+      liveRoot.querySelector("[data-connection] span").textContent = "Connecting to live analysis";
+      liveController = mountLiveAnalysis(liveRoot, body.job.id);
+      liveRoot.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
     } catch (error) {
       status.textContent = error.message;
       form.classList.remove("is-submitting");
@@ -82,6 +97,8 @@ if (form) {
     }
   });
 }
+
+window.addEventListener("popstate", () => window.location.reload());
 
 const health = document.querySelector("[data-health]");
 if (health) {
