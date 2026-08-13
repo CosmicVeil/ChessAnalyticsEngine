@@ -1,21 +1,49 @@
-const form = document.querySelector("[data-analysis-form]");
-if (form) {
-  const buttons = [...document.querySelectorAll("[data-mode-button]")];
-  const panels = [...document.querySelectorAll("[data-mode-panel]")];
-  const status = document.querySelector("[data-form-status]");
-  let mode = "file";
+export function mountSourceTabs(root = document) {
+  const buttons = [...root.querySelectorAll("[data-mode-button]")];
+  const panels = [...root.querySelectorAll("[data-mode-panel]")];
+  const status = root.querySelector("[data-form-status]");
+  let mode = buttons.find((button) => button.getAttribute("aria-selected") === "true")?.dataset.modeButton || "file";
 
   function selectMode(nextMode) {
     mode = nextMode;
     for (const button of buttons) button.setAttribute("aria-selected", String(button.dataset.modeButton === mode));
+    for (const button of buttons) button.tabIndex = button.dataset.modeButton === mode ? 0 : -1;
     for (const panel of panels) {
       const selected = panel.dataset.modePanel === mode;
       panel.hidden = !selected;
       panel.classList.toggle("is-active", selected);
     }
-    status.textContent = "";
+    if (status) status.textContent = "";
   }
-  buttons.forEach((button) => button.addEventListener("click", () => selectMode(button.dataset.modeButton)));
+
+  function selectByKey(button, key) {
+    const current = buttons.indexOf(button);
+    const target = key === "Home" ? 0
+      : key === "End" ? buttons.length - 1
+        : key === "ArrowRight" ? (current + 1) % buttons.length
+          : key === "ArrowLeft" ? (current - 1 + buttons.length) % buttons.length
+            : null;
+    if (target === null) return;
+    selectMode(buttons[target].dataset.modeButton);
+    buttons[target].focus();
+  }
+
+  for (const button of buttons) {
+    button.addEventListener("click", () => selectMode(button.dataset.modeButton));
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      selectByKey(button, event.key);
+    });
+  }
+  selectMode(mode);
+  return { get mode() { return mode; } };
+}
+
+const form = document.querySelector("[data-analysis-form]");
+if (form) {
+  const sourceTabs = mountSourceTabs();
+  const status = document.querySelector("[data-form-status]");
 
   const fileInput = form.elements.pgn_file;
   const fileLabel = document.querySelector("[data-file-label]");
@@ -35,9 +63,9 @@ if (form) {
     event.preventDefault();
     status.textContent = "";
     const data = new FormData();
-    if (mode === "file" && fileInput.files[0]) data.append("pgn_file", fileInput.files[0]);
-    if (mode === "paste") data.append("pgn_text", textarea.value);
-    if (mode === "lichess") data.append("lichess_url", form.elements.lichess_url.value);
+    if (sourceTabs.mode === "file" && fileInput.files[0]) data.append("pgn_file", fileInput.files[0]);
+    if (sourceTabs.mode === "paste") data.append("pgn_text", textarea.value);
+    if (sourceTabs.mode === "lichess") data.append("lichess_url", form.elements.lichess_url.value);
     form.classList.add("is-submitting");
     form.querySelector("button[type=submit]").disabled = true;
     status.textContent = "Stamping source and opening a durable job…";

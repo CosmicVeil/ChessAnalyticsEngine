@@ -53,6 +53,7 @@ class FrontendPageTests(unittest.TestCase):
             self.assertIn(b'name="pgn_file"', response.data)
             self.assertIn(b'name="pgn_text"', response.data)
             self.assertIn(b'name="lichess_url"', response.data)
+            self.assertIn(b'name="score_max"', response.data)
         self.assertIn(f'data-job-id="{job_id}"'.encode(), analysis.data)
 
     def test_visual_system_avoids_disallowed_design_shortcuts(self):

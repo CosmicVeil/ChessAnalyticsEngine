@@ -73,10 +73,12 @@ if (root) {
     const status = data.get("status");
     const agreement = data.get("agreement");
     const minimum = Number(data.get("score_min"));
+    const maximum = Number(data.get("score_max"));
     const score = card.dataset.score === "" ? null : Number(card.dataset.score);
     card.hidden = (status !== "all" && card.dataset.status !== status)
       || (agreement !== "all" && card.dataset.agreement !== agreement)
-      || (data.get("score_min") !== "" && (score === null || score < minimum));
+      || (data.get("score_min") !== "" && (score === null || score < minimum))
+      || (data.get("score_max") !== "" && (score === null || score > maximum));
   }
 
   async function loadStatus() {

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-test-status="running">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Source tabs browser test</title>
+  </head>
+  <body>
+    <main id="fixture">
+      <div role="tablist" aria-label="PGN source">
+        <button id="source-tab-file" type="button" role="tab" aria-selected="true" aria-controls="source-panel-file" data-mode-button="file">Upload PGN</button>
+        <button id="source-tab-paste" type="button" role="tab" aria-selected="false" aria-controls="source-panel-paste" data-mode-button="paste">Paste PGN</button>
+        <button id="source-tab-lichess" type="button" role="tab" aria-selected="false" aria-controls="source-panel-lichess" data-mode-button="lichess">Lichess Study</button>
+      </div>
+      <section id="source-panel-file" role="tabpanel" aria-labelledby="source-tab-file" data-mode-panel="file">File</section>
+      <section id="source-panel-paste" role="tabpanel" aria-labelledby="source-tab-paste" data-mode-panel="paste" hidden>Paste</section>
+      <section id="source-panel-lichess" role="tabpanel" aria-labelledby="source-tab-lichess" data-mode-panel="lichess" hidden>Lichess</section>
+      <output data-form-status></output>
+    </main>
+    <pre id="report"></pre>
+    <script type="module">
+      import { mountSourceTabs } from "../../webapp/static/js/analyze.js?browser-test=1";
+
+      const fixture = document.querySelector("#fixture");
+      const tabs = [...fixture.querySelectorAll("[data-mode-button]")];
+      const panels = [...fixture.querySelectorAll("[data-mode-panel]")];
+      const failures = [];
+      const check = (condition, message) => { if (!condition) failures.push(message); };
+      const press = (tab, key) => tab.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      const activeMode = () => tabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.dataset.modeButton;
+      const visibleMode = () => panels.find((panel) => !panel.hidden)?.dataset.modePanel;
+
+      mountSourceTabs(fixture);
+      press(tabs[0], "ArrowRight");
+      check(activeMode() === "paste" && visibleMode() === "paste", "ArrowRight did not select Paste");
+      check(document.activeElement === tabs[1], "ArrowRight did not move focus");
+      press(tabs[1], "ArrowRight");
+      check(activeMode() === "lichess", "ArrowRight did not select Lichess");
+      press(tabs[2], "ArrowLeft");
+      check(activeMode() === "paste", "ArrowLeft did not select Paste");
+      press(tabs[1], "Home");
+      check(activeMode() === "file" && document.activeElement === tabs[0], "Home did not select Upload");
+      press(tabs[0], "End");
+      check(activeMode() === "lichess" && document.activeElement === tabs[2], "End did not select Lichess");
+
+      document.querySelector("#report").textContent = failures.join("\n") || "PASS";
+      document.documentElement.dataset.testStatus = failures.length ? "failed" : "passed";
+    </script>
+  </body>
+</html>
