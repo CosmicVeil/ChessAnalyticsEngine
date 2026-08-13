@@ -28,7 +28,7 @@ Flask, the PGN ingestion worker, and the result worker run as three independent 
 
 ## What the web application provides
 
-- An editorial, animated landing page with layered chess-piece motion and qualified local benchmark figures.
+- A combined upload and live-results Home with an editorial, animated presentation, layered chess-piece motion, and qualified local benchmark figures.
 - PGN file upload and pasted PGN submission. The Lichess Study control is present but deliberately returns `501 connector_unavailable` until its connector is implemented.
 - Streaming PGN parsing with bounded private disk spooling instead of loading a large upload into memory.
 - Per-game state and separate PyTorch/XGBoost scores, rendered in original PGN order as results arrive.
@@ -101,7 +101,7 @@ The topic topology and process isolation remain intact. Changes to the existing 
 5. The new Flask process and its two web workers sit outside the core. They use existing `chess-moves` and `chess-predictions` topics; no core topic was renamed and the two model libraries remain in separate processes.
 6. `live_pipeline.py` is an additive supervisor for the four existing Python core workers. It imports no model or Flask code, and it stops the remaining workers if one exits so a partially running pipeline is visible immediately.
 
-The web layer also adds PostgreSQL, Alembic migrations, private PGN spooling, durable job events, and idempotent result storage. These additions adapt the pipeline for browser workloads without moving feature extraction or inference into Flask.
+The web layer also adds PostgreSQL, Alembic migrations, private PGN spooling, durable job events, and idempotent result storage. These additions adapt the pipeline for browser workloads without moving feature extraction or inference into Flask. The frontend presentation work changes neither feature extraction nor model inference.
 
 ## Local setup
 
@@ -175,10 +175,10 @@ cd ml-model
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET /` | Landing page |
-| `GET /analyze` | PGN input desk |
-| `GET /analyses/<job_id>` | Live batch page |
-| `GET /system` | Pipeline explanation |
+| `GET /` | Home: combined PGN upload and live-results workspace |
+| `GET /analyze` | Compatibility redirect to Home (`/`) |
+| `GET /analyses/<job_id>` | Restorable Home state for a specific job |
+| `GET /system` | Information page |
 | `POST /api/analyses` | Create a file or paste analysis job |
 | `GET /api/analyses/<job_id>` | Job snapshot and counters |
 | `GET /api/analyses/<job_id>/games` | Filtered, paginated game results |
