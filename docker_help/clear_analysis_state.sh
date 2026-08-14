@@ -35,8 +35,8 @@ while (($#)); do
   esac
 done
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd -- "$script_dir/.." && pwd)"
+script_dir="$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd -P -- "$script_dir/.." && pwd -P)"
 compose_file="$repo_root/infra/docker-compose.yaml"
 
 [[ -f "$compose_file" ]] || fail "Docker Compose file not found: $compose_file"
@@ -119,9 +119,9 @@ while IFS='|' read -r job_id spool_path game_count; do
   spool_basename="$(basename -- "$candidate_path")"
   [[ "$spool_basename" != '.' && "$spool_basename" != '..' ]] || fail "unsafe spool path: $spool_path"
   if [[ -z "$spool_directory" ]]; then
-    [[ -d "$spool_root" && ! -L "$spool_root" ]] || fail "unsafe spool directory: $spool_root"
     cd -P -- "$spool_root" || fail "unsafe spool directory: $spool_root"
-    spool_directory="$PWD"
+    spool_directory="$(pwd -P)"
+    [[ "$spool_directory" == "$spool_root" ]] || fail "unsafe spool directory: $spool_root"
   fi
   [[ ! -L "$spool_basename" ]] || fail "unsafe spool path: $spool_path"
   if [[ -e "$spool_basename" ]]; then

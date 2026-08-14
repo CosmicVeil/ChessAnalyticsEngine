@@ -60,17 +60,31 @@ if [[ \"$*\" == *\"psql\"* ]]; then
     printf 'SQL:%s\\n' \"$sql\" >> \"${FAKE_DOCKER_LOG:?}\"
   fi
   if [[ \"$sql\" == *\"CREATE TEMPORARY TABLE cleanup_targets\"* ]]; then
-    if [[ -n \"${FAKE_NEW_JOB_ID:-}\" && \"$sql\" == *\"WHERE status IN\"* ]]; then
-      printf 'NEW_JOB_MUTATED:%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_DOCKER_LOG:?}\"
+    if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
+      if [[ \"$sql\" == *\"WHERE status IN\"* ]]; then
+        : > \"${FAKE_JOB_STATE}\"
+      else
+        state_tmp=\"${FAKE_JOB_STATE}.tmp\"
+        while IFS= read -r state_job_id; do
+          if [[ \"$sql\" != *\"('$state_job_id'::uuid)\"* ]]; then
+            printf '%s\\n' \"$state_job_id\" >> \"$state_tmp\"
+          fi
+        done < \"${FAKE_JOB_STATE}\"
+        mv \"$state_tmp\" \"${FAKE_JOB_STATE}\"
+      fi
     fi
     if [[ \"${FAKE_SQL_FAIL:-}\" == \"1\" ]]; then
       exit 24
     fi
   fi
   if [[ \"$sql\" == *\"spool_path\"* && \"$sql\" != *\"CREATE TEMPORARY TABLE\"* ]]; then
-    printf '00000000-0000-0000-0000-000000000001|%s|%s\\n' \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
+    preview_job_id=\"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\"
+    if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
+      IFS= read -r preview_job_id < \"${FAKE_JOB_STATE}\"
+    fi
+    printf '%s|%s|%s\\n' \"$preview_job_id\" \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
     if [[ -n \"${FAKE_NEW_JOB_ID:-}\" ]]; then
-      printf 'NEW_JOB_APPEARED:%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_DOCKER_LOG:?}\"
+      printf '%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_JOB_STATE:?}\"
     fi
   fi
 fi
@@ -255,16 +269,21 @@ exit 1
         )
 
     def test_new_job_after_preview_is_not_mutated_by_cleanup_sql(self):
+        preview_job_id = "00000000-0000-0000-0000-000000000001"
         new_job_id = "00000000-0000-0000-0000-000000000002"
+        job_state = self.repo / "job-state"
+        job_state.write_text(f"{preview_job_id}\n", encoding="utf-8")
 
-        result = self.run_script("--yes", env={"FAKE_NEW_JOB_ID": new_job_id})
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_JOB_STATE": str(job_state),
+                "FAKE_NEW_JOB_ID": new_job_id,
+            },
+        )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"NEW_JOB_APPEARED:{new_job_id}", self.docker_log())
-        self.assertNotIn(f"NEW_JOB_MUTATED:{new_job_id}", self.docker_log())
-        cleanup_sql = self.docker_log().split("CREATE TEMPORARY TABLE cleanup_targets", 1)[1]
-        self.assertIn("00000000-0000-0000-0000-000000000001", cleanup_sql)
-        self.assertNotIn(new_job_id, cleanup_sql)
+        self.assertEqual(job_state.read_text(encoding="utf-8"), f"{new_job_id}\n")
 
     def test_sql_failure_retains_validated_spool_file(self):
         spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
@@ -306,6 +325,25 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(outside_file.exists())
         self.assertFalse((self.repo / ".runtime" / "held-spool" / "temporary.pgn").exists())
+
+    def test_static_runtime_symlink_aborts_before_kafka_seek(self):
+        runtime = self.repo / ".runtime"
+        held_runtime = self.repo / "held-runtime"
+        runtime.rename(held_runtime)
+        outside_runtime = self.repo / "outside-runtime"
+        outside_spool = outside_runtime / "pgn-spool"
+        outside_spool.mkdir(parents=True)
+        outside_file = outside_spool / "temporary.pgn"
+        outside_file.write_text("outside", encoding="utf-8")
+        runtime.symlink_to(outside_runtime, target_is_directory=True)
+
+        result = self.run_script(
+            "--yes", env={"FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn"}
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(outside_file.exists())
+        self.assertNotIn("group seek", self.docker_log())
 
     def test_unsafe_spool_path_aborts_before_kafka_seek(self):
         outside = self.repo / "outside.pgn"
