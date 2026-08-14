@@ -80,13 +80,29 @@ run_psql() {
 
 spool_helper() {
   SPOOL_BASENAMES="$spool_basenames" python3 - "$repo_root" "$@" <<'PY'
+import json
 import os
 import stat
 import sys
 import uuid
 
 
-DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+DIRECTORY_FLAGS = (
+    os.O_RDONLY
+    | os.O_DIRECTORY
+    | os.O_NOFOLLOW
+    | getattr(os, "O_CLOEXEC", 0)
+)
+FINGERPRINT_FIELDS = (
+    "st_dev",
+    "st_ino",
+    "st_mode",
+    "st_nlink",
+    "st_uid",
+    "st_gid",
+    "st_size",
+    "st_mtime_ns",
+)
 
 
 def fail(message):
@@ -138,15 +154,47 @@ def direct_basenames():
     return names
 
 
-def metadata(value):
+def fingerprint(item):
+    return [int(getattr(item, field)) for field in FINGERPRINT_FIELDS]
+
+
+def parse_manifest(value):
     try:
-        quarantine, device, inode = value.split("|", 2)
-        if not quarantine.startswith(".cleanup-") or len(quarantine) != 41:
+        value = json.loads(value)
+        if set(value) != {"version", "spool", "entries"} or value["version"] != 1:
             raise ValueError
-        int(quarantine[9:], 16)
-        return quarantine, int(device), int(inode)
-    except ValueError:
-        fail("invalid spool quarantine metadata")
+        spool_identity = value["spool"]
+        entries = value["entries"]
+        if (
+            not isinstance(spool_identity, list)
+            or len(spool_identity) != 2
+            or not all(type(part) is int for part in spool_identity)
+            or not isinstance(entries, list)
+        ):
+            raise ValueError
+        parsed_entries = []
+        seen = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or set(entry) != {"name", "fingerprint"}:
+                raise ValueError
+            name = entry["name"]
+            expected = entry["fingerprint"]
+            if (
+                not isinstance(name, str)
+                or not name
+                or name in (".", "..")
+                or "/" in name
+                or name in seen
+                or not isinstance(expected, list)
+                or len(expected) != len(FINGERPRINT_FIELDS)
+                or not all(type(part) is int for part in expected)
+            ):
+                raise ValueError
+            seen.add(name)
+            parsed_entries.append((name, expected))
+        return tuple(spool_identity), parsed_entries
+    except (TypeError, ValueError, json.JSONDecodeError):
+        fail("invalid spool manifest")
 
 
 def require_same_spool(spool_fd, device, inode):
@@ -155,15 +203,11 @@ def require_same_spool(spool_fd, device, inode):
         fail("spool directory changed; refusing cleanup")
 
 
-def prepare(repo_root):
+def freeze(repo_root):
     spool_fd = open_spool(repo_root)
-    quarantine_fd = None
-    moved = []
-    quarantine = ".cleanup-" + uuid.uuid4().hex
     try:
-        original = os.fstat(spool_fd)
-        os.mkdir(quarantine, mode=0o700, dir_fd=spool_fd)
-        quarantine_fd = os.open(quarantine, DIRECTORY_FLAGS, dir_fd=spool_fd)
+        spool = os.fstat(spool_fd)
+        entries = []
         for name in direct_basenames():
             try:
                 item = os.stat(name, dir_fd=spool_fd, follow_symlinks=False)
@@ -171,95 +215,151 @@ def prepare(repo_root):
                 continue
             if not stat.S_ISREG(item.st_mode):
                 fail("unsafe spool file")
-            os.rename(name, name, src_dir_fd=spool_fd, dst_dir_fd=quarantine_fd)
-            moved.append(name)
-        print(f"{quarantine}|{original.st_dev}|{original.st_ino}")
-    except BaseException:
-        if quarantine_fd is not None:
-            for name in reversed(moved):
+            entries.append({"name": name, "fingerprint": fingerprint(item)})
+        print(
+            json.dumps(
+                {
+                    "version": 1,
+                    "spool": [int(spool.st_dev), int(spool.st_ino)],
+                    "entries": entries,
+                },
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+        )
+    finally:
+        os.close(spool_fd)
+
+
+def safe_location(quarantine, moved_name):
+    return f".runtime/pgn-spool/{quarantine}/{moved_name}"
+
+
+def restore_without_replace(spool_fd, quarantine_fd, name, moved_name):
+    try:
+        os.link(
+            moved_name,
+            name,
+            src_dir_fd=quarantine_fd,
+            dst_dir_fd=spool_fd,
+            follow_symlinks=False,
+        )
+    except FileExistsError:
+        return "private", "the original name is occupied"
+    except OSError as error:
+        return "private", f"no-replace restore failed: {error}"
+    try:
+        os.unlink(moved_name, dir_fd=quarantine_fd)
+    except OSError as error:
+        return "both", f"restored link but private link remains: {error}"
+    return "original", ""
+
+
+def cleanup(repo_root, manifest):
+    spool_identity, entries = parse_manifest(manifest)
+    spool_fd = open_spool(repo_root)
+    quarantine = ".cleanup-" + uuid.uuid4().hex
+    quarantine_fd = None
+    deleted = 0
+    already_absent = 0
+    retained = 0
+    errors = 0
+    try:
+        require_same_spool(spool_fd, *spool_identity)
+        os.mkdir(quarantine, mode=0o700, dir_fd=spool_fd)
+        quarantine_fd = os.open(quarantine, DIRECTORY_FLAGS, dir_fd=spool_fd)
+        for index, (name, expected) in enumerate(entries):
+            moved_name = f"{index:08x}-{uuid.uuid4().hex}"
+            try:
+                os.rename(
+                    name,
+                    moved_name,
+                    src_dir_fd=spool_fd,
+                    dst_dir_fd=quarantine_fd,
+                )
+            except FileNotFoundError:
+                already_absent += 1
+                print(f"Spool file already absent; nothing removed: {name}")
+                continue
+            except OSError as error:
+                retained += 1
+                errors += 1
+                print(f"Spool file retained at original name {name}: {error}")
+                continue
+
+            location = safe_location(quarantine, moved_name)
+            try:
+                moved = os.stat(
+                    moved_name, dir_fd=quarantine_fd, follow_symlinks=False
+                )
+            except OSError as error:
+                retained += 1
+                errors += 1
+                print(f"Moved spool entry retained at {location}: {error}")
+                continue
+
+            if fingerprint(moved) == expected:
                 try:
-                    os.rename(name, name, src_dir_fd=quarantine_fd, dst_dir_fd=spool_fd)
-                except OSError:
-                    pass
+                    os.unlink(moved_name, dir_fd=quarantine_fd)
+                except OSError as error:
+                    retained += 1
+                    errors += 1
+                    print(f"Verified spool file retained at {location}: {error}")
+                else:
+                    deleted += 1
+                    print(f"Deleted verified spool file: {name}")
+                continue
+
+            retained += 1
+            outcome, detail = restore_without_replace(
+                spool_fd, quarantine_fd, name, moved_name
+            )
+            if outcome == "original":
+                print(f"Changed spool file retained at original name: {name}")
+            elif outcome == "both":
+                errors += 1
+                print(
+                    f"Changed spool file retained at {name} and {location}: {detail}"
+                )
+            else:
+                if not detail.startswith("the original name is occupied"):
+                    errors += 1
+                print(f"Changed spool file retained at {location}: {detail}")
+    finally:
+        if quarantine_fd is not None:
             os.close(quarantine_fd)
-            quarantine_fd = None
+        os.close(spool_fd)
+
+    spool_fd = open_spool(repo_root)
+    quarantine_retained = False
+    try:
+        require_same_spool(spool_fd, *spool_identity)
         try:
             os.rmdir(quarantine, dir_fd=spool_fd)
-        except OSError:
-            pass
-        raise
-    finally:
-        if quarantine_fd is not None:
-            os.close(quarantine_fd)
-        os.close(spool_fd)
-
-
-def reopen_quarantine(repo_root, value):
-    quarantine, device, inode = metadata(value)
-    spool_fd = open_spool(repo_root)
-    require_same_spool(spool_fd, device, inode)
-    try:
-        quarantine_fd = os.open(quarantine, DIRECTORY_FLAGS, dir_fd=spool_fd)
-    except BaseException:
-        os.close(spool_fd)
-        raise
-    return spool_fd, quarantine_fd, quarantine
-
-
-def restore(repo_root, value):
-    spool_fd, quarantine_fd, quarantine = reopen_quarantine(repo_root, value)
-    try:
-        for name in os.listdir(quarantine_fd):
-            item = os.stat(name, dir_fd=quarantine_fd, follow_symlinks=False)
-            if not stat.S_ISREG(item.st_mode):
-                fail("unsafe quarantined spool file")
-            try:
-                os.stat(name, dir_fd=spool_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                pass
-            else:
-                fail("spool file appeared during restore")
-            os.rename(name, name, src_dir_fd=quarantine_fd, dst_dir_fd=spool_fd)
-    finally:
-        os.close(quarantine_fd)
-        os.close(spool_fd)
-    spool_fd = open_spool(repo_root)
-    try:
-        _, device, inode = metadata(value)
-        require_same_spool(spool_fd, device, inode)
-        os.rmdir(quarantine, dir_fd=spool_fd)
+        except OSError as error:
+            quarantine_retained = True
+            print(
+                "Private spool cleanup directory retained at "
+                f".runtime/pgn-spool/{quarantine}: {error}"
+            )
     finally:
         os.close(spool_fd)
 
-
-def discard(repo_root, value):
-    spool_fd, quarantine_fd, quarantine = reopen_quarantine(repo_root, value)
-    try:
-        for name in os.listdir(quarantine_fd):
-            item = os.stat(name, dir_fd=quarantine_fd, follow_symlinks=False)
-            if not stat.S_ISREG(item.st_mode):
-                fail("unsafe quarantined spool file")
-            os.unlink(name, dir_fd=quarantine_fd)
-    finally:
-        os.close(quarantine_fd)
-        os.close(spool_fd)
-    spool_fd = open_spool(repo_root)
-    try:
-        _, device, inode = metadata(value)
-        require_same_spool(spool_fd, device, inode)
-        os.rmdir(quarantine, dir_fd=spool_fd)
-    finally:
-        os.close(spool_fd)
+    print(
+        "Spool cleanup summary: "
+        f"deleted={deleted}, already_absent={already_absent}, "
+        f"retained={retained}, errors={errors}"
+    )
+    if retained or errors or quarantine_retained:
+        raise SystemExit(1)
 
 
 try:
     root, action = sys.argv[1:3]
-    if action == "prepare":
-        prepare(root)
-    elif action == "restore" and len(sys.argv) == 4:
-        restore(root, sys.argv[3])
-    elif action == "discard" and len(sys.argv) == 4:
-        discard(root, sys.argv[3])
+    if action == "freeze" and len(sys.argv) == 3:
+        freeze(root)
+    elif action == "cleanup" and len(sys.argv) == 4:
+        cleanup(root, sys.argv[3])
     else:
         fail("invalid spool helper action")
 except OSError as error:
@@ -327,19 +427,16 @@ group_members="$(printf '%s\n' "$group_description" | awk '
 [[ "$group_members" =~ ^[0-9]+$ && "$group_members" == '0' ]] || \
   fail 'Kafka group has active members; stop the application first'
 
-quarantine_metadata=''
+spool_manifest=''
 if [[ -n "$spool_basenames" ]]; then
-  if ! quarantine_metadata="$(spool_helper prepare)"; then
-    fail 'could not safely quarantine spool files'
+  if ! spool_manifest="$(spool_helper freeze)"; then
+    fail 'could not safely freeze spool manifest'
   fi
 fi
 
 if ! docker compose -f "$compose_file" exec -T redpanda-0 \
   rpk group seek chess-state-managers --to end --topics chess-moves; then
-  if [[ -n "$quarantine_metadata" ]] && ! spool_helper restore "$quarantine_metadata"; then
-    fail 'Kafka group seek failed and spool files could not be restored'
-  fi
-  fail 'Kafka group seek failed; PostgreSQL was not changed'
+  fail 'Kafka group seek failed; PostgreSQL was not changed and spool cleanup was not attempted'
 fi
 
 if [[ -n "$target_values" ]]; then
@@ -413,14 +510,11 @@ COMMIT;
 "
 
 if ! run_psql <<<"$maintenance_sql"; then
-  if [[ -n "$quarantine_metadata" ]] && ! spool_helper restore "$quarantine_metadata"; then
-    fail 'analysis cleanup transaction failed and spool files could not be restored'
-  fi
-  fail 'analysis cleanup transaction failed; spool files were retained'
+  fail 'analysis cleanup transaction failed; spool cleanup was not attempted'
 fi
 
-if [[ -n "$quarantine_metadata" ]] && ! spool_helper discard "$quarantine_metadata"; then
-  fail 'analysis cleanup succeeded but quarantined spool files were retained'
+if [[ -n "$spool_manifest" ]] && ! spool_helper cleanup "$spool_manifest"; then
+  fail 'analysis cleanup committed; spool cleanup incomplete; per-file status is shown above'
 fi
 
 printf '%s\n' 'Unfinished analysis state cleared. Restart services and upload again.'

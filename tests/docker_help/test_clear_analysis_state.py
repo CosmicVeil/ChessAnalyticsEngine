@@ -35,6 +35,18 @@ class ClearAnalysisStateCommandTests(unittest.TestCase):
             """#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' \"$*\" >> \"${FAKE_DOCKER_LOG:?}\"
+observe_spool() {
+  local boundary="$1"
+  if [[ -z "${FAKE_OBSERVE_SPOOL_FILE:-}" ]]; then
+    return
+  fi
+  if [[ -f "${FAKE_OBSERVE_SPOOL_FILE}" && ! -L "${FAKE_OBSERVE_SPOOL_FILE}" ]]; then
+    printf 'SPOOL_%s:present:%s\\n' \
+      "$boundary" "$(cat -- "${FAKE_OBSERVE_SPOOL_FILE}")" >> "${FAKE_DOCKER_LOG:?}"
+  else
+    printf 'SPOOL_%s:missing-or-unsafe\\n' "$boundary" >> "${FAKE_DOCKER_LOG:?}"
+  fi
+}
 if [[ \"$*\" == *\"config --services\"* ]]; then
   if [[ \"${FAKE_MISSING_REDPANDA:-}\" == \"1\" ]]; then
     printf 'postgres\\n'
@@ -46,6 +58,7 @@ if [[ \"$*\" == *\"rpk group describe chess-state-managers\"* ]]; then
   printf 'GROUP chess-state-managers\\nMEMBERS %s\\n' \"${FAKE_GROUP_MEMBERS:-0}\"
 fi
 if [[ \"$*\" == *\"rpk group seek chess-state-managers\"* ]]; then
+  observe_spool SEEK
   if [[ \"${FAKE_SWAP_SPOOL_ROOT:-}\" == \"1\" ]]; then
     mv \"${FAKE_SPOOL_ROOT:?}\" \"${FAKE_HELD_SPOOL_ROOT:?}\"
     ln -s \"${FAKE_OUTSIDE_SPOOL_ROOT:?}\" \"${FAKE_SPOOL_ROOT:?}\"
@@ -60,6 +73,24 @@ if [[ \"$*\" == *\"psql\"* ]]; then
     printf 'SQL:%s\\n' \"$sql\" >> \"${FAKE_DOCKER_LOG:?}\"
   fi
   if [[ \"$sql\" == *\"CREATE TEMPORARY TABLE cleanup_targets\"* ]]; then
+    observe_spool SQL
+    if [[ "${FAKE_INJECT_NON_TARGET_DURING_SQL:-}" == "1" ]]; then
+      injected=false
+      for cleanup_dir in "${FAKE_SPOOL_ROOT:?}"/.cleanup-*; do
+        if [[ -d "$cleanup_dir" ]]; then
+          printf 'injected' > "$cleanup_dir/not-in-manifest.pgn"
+          injected=true
+        fi
+      done
+      if ! "$injected"; then
+        printf 'injected' > "${FAKE_SPOOL_ROOT:?}/not-in-manifest.pgn"
+      fi
+    fi
+    if [[ -n "${FAKE_REPLACE_SPOOL_FILE:-}" ]]; then
+      mv "${FAKE_REPLACE_SPOOL_FILE}" "${FAKE_REPLACED_SPOOL_FILE:?}"
+      printf '%s' "${FAKE_REPLACEMENT_CONTENT:-replacement}" \
+        > "${FAKE_REPLACE_SPOOL_FILE}"
+    fi
     if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
       if [[ \"$sql\" == *\"WHERE status IN\"* ]]; then
         : > \"${FAKE_JOB_STATE}\"
@@ -79,11 +110,15 @@ if [[ \"$*\" == *\"psql\"* ]]; then
     fi
   fi
   if [[ \"$sql\" == *\"spool_path\"* && \"$sql\" != *\"CREATE TEMPORARY TABLE\"* ]]; then
-    preview_job_id=\"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\"
-    if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
-      IFS= read -r preview_job_id < \"${FAKE_JOB_STATE}\"
+    if [[ -n "${FAKE_PREVIEW_ROWS_FILE:-}" ]]; then
+      cat -- "${FAKE_PREVIEW_ROWS_FILE}"
+    else
+      preview_job_id=\"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\"
+      if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
+        IFS= read -r preview_job_id < \"${FAKE_JOB_STATE}\"
+      fi
+      printf '%s|%s|%s\\n' \"$preview_job_id\" \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
     fi
-    printf '%s|%s|%s\\n' \"$preview_job_id\" \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
     if [[ -n \"${FAKE_NEW_JOB_ID:-}\" ]]; then
       printf '%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_JOB_STATE:?}\"
     fi
@@ -269,6 +304,24 @@ exit 1
             log.index("CREATE TEMPORARY TABLE cleanup_targets"),
         )
 
+    def test_spool_file_stays_at_original_path_through_seek_and_sql(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("frozen identity", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_OBSERVE_SPOOL_FILE": str(spool_file),
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = self.docker_log()
+        self.assertIn("SPOOL_SEEK:present:frozen identity", log)
+        self.assertIn("SPOOL_SQL:present:frozen identity", log)
+        self.assertFalse(spool_file.exists())
+
     def test_new_job_after_preview_is_not_mutated_by_cleanup_sql(self):
         preview_job_id = "00000000-0000-0000-0000-000000000001"
         new_job_id = "00000000-0000-0000-0000-000000000002"
@@ -296,7 +349,7 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(job_state.read_text(encoding="utf-8"), "")
 
-    def test_sql_failure_retains_validated_spool_file(self):
+    def test_sql_failure_leaves_original_spool_file_in_place(self):
         spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
         spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
 
@@ -305,11 +358,14 @@ exit 1
             env={
                 "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
                 "FAKE_SQL_FAIL": "1",
+                "FAKE_OBSERVE_SPOOL_FILE": str(spool_file),
             },
         )
 
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(spool_file.exists())
+        self.assertEqual(spool_file.read_text(encoding="utf-8"), '[Event \\"Temporary\\"]')
+        self.assertIn('SPOOL_SQL:present:[Event \\"Temporary\\"]', self.docker_log())
         self.assertIn("group seek chess-state-managers", self.docker_log())
         self.assertIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
 
@@ -335,10 +391,9 @@ exit 1
 
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(outside_file.exists())
-        self.assertFalse((self.repo / ".runtime" / "held-spool" / "temporary.pgn").exists())
-        self.assertTrue(any((self.repo / ".runtime" / "held-spool").iterdir()))
+        self.assertTrue((self.repo / ".runtime" / "held-spool" / "temporary.pgn").exists())
 
-    def test_kafka_seek_failure_restores_quarantined_spool_file(self):
+    def test_kafka_seek_failure_leaves_original_spool_file_in_place(self):
         spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
         spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
 
@@ -347,12 +402,100 @@ exit 1
             env={
                 "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
                 "FAKE_KAFKA_SEEK_FAIL": "1",
+                "FAKE_OBSERVE_SPOOL_FILE": str(spool_file),
             },
         )
 
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue(spool_file.exists())
+        self.assertEqual(spool_file.read_text(encoding="utf-8"), '[Event \\"Temporary\\"]')
+        self.assertIn('SPOOL_SEEK:present:[Event \\"Temporary\\"]', self.docker_log())
         self.assertFalse(list((self.repo / ".runtime" / "pgn-spool").glob(".cleanup-*")))
+
+    def test_replacement_identity_is_not_deleted_or_overwritten(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("frozen identity", encoding="utf-8")
+        displaced_file = self.repo / "displaced-original.pgn"
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_REPLACE_SPOOL_FILE": str(spool_file),
+                "FAKE_REPLACED_SPOOL_FILE": str(displaced_file),
+                "FAKE_REPLACEMENT_CONTENT": "concurrent replacement",
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(displaced_file.exists())
+        self.assertEqual(displaced_file.read_text(encoding="utf-8"), "frozen identity")
+        self.assertEqual(spool_file.read_text(encoding="utf-8"), "concurrent replacement")
+        self.assertIn(
+            "Spool cleanup summary: deleted=0, already_absent=0, retained=1, errors=0",
+            result.stdout,
+        )
+
+    def test_only_frozen_manifest_entries_are_considered_for_cleanup(self):
+        spool_root = self.repo / ".runtime" / "pgn-spool"
+        target = spool_root / "temporary.pgn"
+        target.write_text("target", encoding="utf-8")
+        injected = spool_root / "not-in-manifest.pgn"
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_INJECT_NON_TARGET_DURING_SQL": "1",
+                "FAKE_SPOOL_ROOT": str(spool_root),
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(target.exists())
+        self.assertTrue(injected.exists())
+        self.assertEqual(injected.read_text(encoding="utf-8"), "injected")
+
+    def test_partial_cleanup_reports_deleted_and_retained_counts(self):
+        spool_root = self.repo / ".runtime" / "pgn-spool"
+        first = spool_root / "first.pgn"
+        second = spool_root / "second.pgn"
+        first.write_text("first frozen identity", encoding="utf-8")
+        second.write_text("second frozen identity", encoding="utf-8")
+        displaced_second = self.repo / "displaced-second.pgn"
+        preview_rows = self.repo / "preview-rows"
+        preview_rows.write_text(
+            "00000000-0000-0000-0000-000000000001|"
+            ".runtime/pgn-spool/first.pgn|0\n"
+            "00000000-0000-0000-0000-000000000002|"
+            ".runtime/pgn-spool/second.pgn|0\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_PREVIEW_ROWS_FILE": str(preview_rows),
+                "FAKE_REPLACE_SPOOL_FILE": str(second),
+                "FAKE_REPLACED_SPOOL_FILE": str(displaced_second),
+                "FAKE_REPLACEMENT_CONTENT": "second concurrent replacement",
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(first.exists())
+        self.assertEqual(
+            displaced_second.read_text(encoding="utf-8"), "second frozen identity"
+        )
+        self.assertEqual(
+            second.read_text(encoding="utf-8"), "second concurrent replacement"
+        )
+        self.assertIn(
+            "Spool cleanup summary: deleted=1, already_absent=0, retained=1, errors=0",
+            result.stdout,
+        )
+        self.assertIn("spool cleanup incomplete", result.stderr)
+        self.assertNotIn("spool files were retained", result.stderr)
 
     def test_static_runtime_symlink_aborts_before_kafka_seek(self):
         runtime = self.repo / ".runtime"
