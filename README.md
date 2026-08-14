@@ -161,6 +161,32 @@ cd ml-model
 ../.venv/bin/python train_xgboost.py
 ```
 
+## Clear unfinished analysis state
+
+Use this local recovery command only when no application process is running. Stop Flask, the web ingestion and result workers, the Go feature extractor, and the core Python workers first; leave PostgreSQL and Redpanda running. The command also refuses to continue while the `chess-state-managers` Kafka group has active members.
+
+> **Warning:** This permanently discards Kafka move lag and every selected unfinished analysis, including its games, results, events, unmatched pipeline results, and matching private PGN spool file. It preserves terminal jobs (`completed`, `partial`, and `failed`), but the deleted analyses cannot be recovered.
+
+From the repository root, preview and clear all unfinished jobs (`queued`, `parsing`, and `live`):
+
+```bash
+docker_help/clear_analysis_state.sh
+```
+
+The command prints each target, then requires you to type `CLEAR`. Use `--yes` only when you have reviewed the impact and need non-interactive execution:
+
+```bash
+docker_help/clear_analysis_state.sh --yes
+```
+
+To target only unfinished jobs with an expired lease that have been unchanged for at least 30 minutes:
+
+```bash
+docker_help/clear_analysis_state.sh --stale-minutes 30
+```
+
+After cleanup, restart the stopped services and upload the PGN again to begin a new analysis.
+
 ## Configuration
 
 | Variable | Purpose | Development default |
