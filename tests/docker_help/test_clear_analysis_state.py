@@ -4,6 +4,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -54,11 +55,40 @@ if [[ \"$*\" == *\"config --services\"* ]]; then
     printf 'postgres\\nredpanda-0\\n'
   fi
 fi
-if [[ \"$*\" == *\"rpk group describe chess-state-managers\"* ]]; then
-  printf 'GROUP chess-state-managers\\nMEMBERS %s\\n' \"${FAKE_GROUP_MEMBERS:-0}\"
+if [[ \"$*\" == *\"rpk group describe chess-state-managers --print-commits\"* ]]; then
+  if [[ -n \"${FAKE_POST_SEEK_DESCRIPTION_FILE:-}\" ]]; then
+    cat -- \"${FAKE_POST_SEEK_DESCRIPTION_FILE}\"
+  elif [[ \"${FAKE_POST_SEEK_AMBIGUOUS:-}\" == \"1\" ]]; then
+    printf '%s\\n' \
+      'TOPIC        PARTITION  CURRENT-OFFSET  LOG-START-OFFSET  LOG-END-OFFSET  LAG   MEMBER-ID  CLIENT-ID  HOST' \
+      'chess-moves  0          12              0                 12              -'
+  else
+    printf '%s\\n' \
+      'TOPIC        PARTITION  CURRENT-OFFSET  LOG-START-OFFSET  LOG-END-OFFSET  LAG   MEMBER-ID  CLIENT-ID  HOST' \
+      \"chess-moves  0          12              0                 12              ${FAKE_POST_SEEK_LAG:-0}\"
+  fi
+elif [[ \"$*\" == *\"rpk group describe chess-state-managers\"* ]]; then
+  printf '%s\\n' \
+    'GROUP        chess-state-managers' \
+    'COORDINATOR  0' \
+    'STATE        Empty' \
+    'BALANCER' \
+    \"MEMBERS      ${FAKE_GROUP_MEMBERS:-0}\" \
+    'TOTAL-LAG    2' \
+    '' \
+    'TOPIC        PARTITION  CURRENT-OFFSET  LOG-START-OFFSET  LOG-END-OFFSET  LAG   MEMBER-ID  CLIENT-ID  HOST' \
+    'chess-moves  0          10              0                 12              2'
 fi
 if [[ \"$*\" == *\"rpk group seek chess-state-managers\"* ]]; then
   observe_spool SEEK
+  if [[ -n \"${FAKE_REPLACE_BEFORE_SEEK_FILE:-}\" ]]; then
+    mv \"${FAKE_REPLACE_BEFORE_SEEK_FILE}\" \"${FAKE_REPLACED_BEFORE_SEEK_FILE:?}\"
+    printf '%s' \"${FAKE_REPLACEMENT_CONTENT:-replacement}\" \
+      > \"${FAKE_REPLACE_BEFORE_SEEK_FILE}\"
+  fi
+  if [[ -n \"${FAKE_REAL_PSQL_HELPER:-}\" && -n \"${FAKE_REAL_RACE_JOB_ID:-}\" ]]; then
+    \"${FAKE_REAL_PSQL_PYTHON:?}\" \"${FAKE_REAL_PSQL_HELPER}\" race
+  fi
   if [[ \"${FAKE_SWAP_SPOOL_ROOT:-}\" == \"1\" ]]; then
     mv \"${FAKE_SPOOL_ROOT:?}\" \"${FAKE_HELD_SPOOL_ROOT:?}\"
     ln -s \"${FAKE_OUTSIDE_SPOOL_ROOT:?}\" \"${FAKE_SPOOL_ROOT:?}\"
@@ -68,6 +98,10 @@ if [[ \"$*\" == *\"rpk group seek chess-state-managers\"* ]]; then
   fi
 fi
 if [[ \"$*\" == *\"psql\"* ]]; then
+  if [[ -n \"${FAKE_REAL_PSQL_HELPER:-}\" ]]; then
+    \"${FAKE_REAL_PSQL_PYTHON:?}\" \"${FAKE_REAL_PSQL_HELPER}\" psql
+    exit
+  fi
   sql=\"$(cat)\"
   if [[ -n \"$sql\" ]]; then
     printf 'SQL:%s\\n' \"$sql\" >> \"${FAKE_DOCKER_LOG:?}\"
@@ -91,23 +125,51 @@ if [[ \"$*\" == *\"psql\"* ]]; then
       printf '%s' "${FAKE_REPLACEMENT_CONTENT:-replacement}" \
         > "${FAKE_REPLACE_SPOOL_FILE}"
     fi
-    if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
-      if [[ \"$sql\" == *\"WHERE status IN\"* ]]; then
-        : > \"${FAKE_JOB_STATE}\"
-      else
-        state_tmp=\"${FAKE_JOB_STATE}.tmp\"
-        : > \"$state_tmp\"
-        while IFS= read -r state_job_id; do
-          if [[ \"$sql\" != *\"('$state_job_id'::uuid)\"* ]]; then
-            printf '%s\\n' \"$state_job_id\" >> \"$state_tmp\"
-          fi
-        done < \"${FAKE_JOB_STATE}\"
-        mv \"$state_tmp\" \"${FAKE_JOB_STATE}\"
-      fi
-    fi
     if [[ \"${FAKE_SQL_FAIL:-}\" == \"1\" ]]; then
       exit 24
     fi
+    if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
+      state_tmp=\"${FAKE_JOB_STATE}.tmp\"
+      : > \"$state_tmp\"
+      while IFS='|' read -r state_job_id state_status; do
+        [[ -n \"$state_job_id\" ]] || continue
+        state_status=\"${state_status:-live}\"
+        if [[ \"$sql\" == *\"('$state_job_id'::uuid)\"* ]]; then
+          case \"$state_status\" in
+            queued|parsing|live)
+              printf 'CLEANUP_DELETED|%s\\n' \"$state_job_id\"
+              continue
+              ;;
+            *)
+              printf 'CLEANUP_SKIPPED|%s|%s\\n' \"$state_job_id\" \"$state_status\"
+              ;;
+          esac
+        fi
+        printf '%s|%s\\n' \"$state_job_id\" \"$state_status\" >> \"$state_tmp\"
+      done < \"${FAKE_JOB_STATE}\"
+      mv \"$state_tmp\" \"${FAKE_JOB_STATE}\"
+    elif [[ -n \"${FAKE_PREVIEW_ROWS_FILE:-}\" ]]; then
+      while IFS='|' read -r deleted_job_id _; do
+        [[ -n \"$deleted_job_id\" ]] || continue
+        printf 'CLEANUP_DELETED|%s\\n' \"$deleted_job_id\"
+      done < \"${FAKE_PREVIEW_ROWS_FILE}\"
+    elif [[ -n \"${FAKE_RACE_TARGET_STATUS:-}\" ]]; then
+      printf 'CLEANUP_SKIPPED|%s|%s\\n' \
+        \"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\" \
+        \"${FAKE_RACE_TARGET_STATUS}\"
+    else
+      printf 'CLEANUP_DELETED|%s\\n' \
+        \"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\"
+    fi
+  fi
+  if [[ \"$sql\" == *\"terminal_statuses(status)\"* ]]; then
+    if [[ \"${FAKE_TERMINAL_REPORT_FAIL:-}\" == \"1\" ]]; then
+      exit 25
+    fi
+    printf 'TERMINAL|completed|%s\\n' \"${FAKE_TERMINAL_COMPLETED:-2}\"
+    printf 'TERMINAL|partial|%s\\n' \"${FAKE_TERMINAL_PARTIAL:-1}\"
+    printf 'TERMINAL|failed|%s\\n' \"${FAKE_TERMINAL_FAILED:-3}\"
+    printf 'TERMINAL|total|%s\\n' \"${FAKE_TERMINAL_TOTAL:-6}\"
   fi
   if [[ \"$sql\" == *\"spool_path\"* && \"$sql\" != *\"CREATE TEMPORARY TABLE\"* ]]; then
     if [[ -n "${FAKE_PREVIEW_ROWS_FILE:-}" ]]; then
@@ -115,12 +177,20 @@ if [[ \"$*\" == *\"psql\"* ]]; then
     else
       preview_job_id=\"${FAKE_PREVIEW_JOB_ID:-00000000-0000-0000-0000-000000000001}\"
       if [[ -n \"${FAKE_JOB_STATE:-}\" ]]; then
-        IFS= read -r preview_job_id < \"${FAKE_JOB_STATE}\"
+        IFS='|' read -r preview_job_id _ < \"${FAKE_JOB_STATE}\"
       fi
       printf '%s|%s|%s\\n' \"$preview_job_id\" \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
     fi
     if [[ -n \"${FAKE_NEW_JOB_ID:-}\" ]]; then
-      printf '%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_JOB_STATE:?}\"
+      printf '%s|live\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_JOB_STATE:?}\"
+    fi
+    if [[ -n \"${FAKE_RACE_TARGET_STATUS:-}\" && -n \"${FAKE_JOB_STATE:-}\" ]]; then
+      state_tmp=\"${FAKE_JOB_STATE}.tmp\"
+      while IFS='|' read -r state_job_id _; do
+        [[ -n \"$state_job_id\" ]] || continue
+        printf '%s|%s\\n' \"$state_job_id\" \"${FAKE_RACE_TARGET_STATUS}\"
+      done < \"${FAKE_JOB_STATE}\" > \"$state_tmp\"
+      mv \"$state_tmp\" \"${FAKE_JOB_STATE}\"
     fi
   fi
 fi
@@ -130,6 +200,11 @@ fi
             "pgrep",
             """#!/usr/bin/env bash
 set -euo pipefail
+if [[ -n \"${FAKE_PGREP_STATUS:-}\" ]]; then
+  if [[ \"${FAKE_PGREP_PATTERN:-all}\" == \"all\" || \"$*\" == *\"${FAKE_PGREP_PATTERN}\"* ]]; then
+    exit \"${FAKE_PGREP_STATUS}\"
+  fi
+fi
 if [[ \"${FAKE_ACTIVE_WORKER:-}\" == \"1\" && \"$*\" == *\"webapp\"* ]]; then
   exit 0
 fi
@@ -206,6 +281,34 @@ exit 1
         self.assertIn("ingestion worker is running", result.stderr)
         self.assertNotIn("group seek", self.docker_log())
 
+    def test_refuses_when_ingestion_worker_inspection_fails(self):
+        result = self.run_script(
+            "--yes",
+            env={"FAKE_PGREP_STATUS": "2", "FAKE_PGREP_PATTERN": "webapp"},
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not inspect ingestion worker processes", result.stderr)
+        self.assertEqual(self.docker_log(), "")
+
+    def test_refuses_when_go_process_inspection_fails(self):
+        result = self.run_script(
+            "--yes",
+            env={"FAKE_PGREP_STATUS": "3", "FAKE_PGREP_PATTERN": "go-build"},
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not inspect Go feature extractor processes", result.stderr)
+        self.assertEqual(self.docker_log(), "")
+
+    def test_pgrep_exit_one_is_treated_as_no_matching_process(self):
+        result = self.run_script(
+            "--yes", env={"FAKE_PGREP_STATUS": "1", "FAKE_PGREP_PATTERN": "all"}
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Safety checks passed.", result.stdout)
+
     def test_refuses_when_go_run_extractor_has_trailing_arguments(self):
         result = self.run_script("--yes", env={"FAKE_PROCESS": "go run . --poll"})
 
@@ -247,6 +350,23 @@ exit 1
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("confirmation", result.stderr)
+        self.assertIn("rpk group describe chess-state-managers", self.docker_log())
+        self.assertNotIn("group seek", self.docker_log())
+
+    def test_spool_manifest_is_validated_before_confirmation(self):
+        outside = self.repo / "outside.pgn"
+        outside.write_text("outside", encoding="utf-8")
+        symlink = self.repo / ".runtime" / "pgn-spool" / "linked.pgn"
+        symlink.symlink_to(outside)
+
+        result = self.run_script(
+            env={"FAKE_SPOOL_PATH": ".runtime/pgn-spool/linked.pgn"},
+            input="no\n",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not safely freeze spool manifest", result.stderr)
+        self.assertNotIn("confirmation declined", result.stderr)
         self.assertNotIn("group seek", self.docker_log())
 
     def test_preview_shows_each_target_spool_path_and_game_count(self):
@@ -269,8 +389,51 @@ exit 1
         result = self.run_script("--yes")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("GROUP chess-state-managers\nMEMBERS 0", result.stdout)
+        self.assertIn("GROUP        chess-state-managers", result.stdout)
+        self.assertIn("MEMBERS      0", result.stdout)
         self.assertIn("group seek chess-state-managers", self.docker_log())
+
+    def test_seek_allows_new_topic_partitions_and_verifies_each_commit(self):
+        post_seek = self.repo / "post-seek-description"
+        post_seek.write_text(
+            "TOPIC        PARTITION  CURRENT-OFFSET  LOG-START-OFFSET  "
+            "LOG-END-OFFSET  LAG   MEMBER-ID  CLIENT-ID  HOST\n"
+            "chess-moves  0          12              0                 "
+            "12              0\n"
+            "chess-moves  1          7               0                 "
+            "7               0\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_script(
+            "--yes", env={"FAKE_POST_SEEK_DESCRIPTION_FILE": str(post_seek)}
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = self.docker_log()
+        self.assertIn(
+            "group seek chess-state-managers --to end --topics chess-moves "
+            "--allow-new-topics",
+            log,
+        )
+        self.assertIn(
+            "group describe chess-state-managers --print-commits", log
+        )
+        self.assertIn("chess-moves  1", result.stdout)
+
+    def test_post_seek_nonzero_lag_refuses_database_cleanup(self):
+        result = self.run_script("--yes", env={"FAKE_POST_SEEK_LAG": "1"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not prove zero chess-moves lag", result.stderr)
+        self.assertNotIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
+
+    def test_post_seek_ambiguous_lag_refuses_database_cleanup(self):
+        result = self.run_script("--yes", env={"FAKE_POST_SEEK_AMBIGUOUS": "1"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not prove zero chess-moves lag", result.stderr)
+        self.assertNotIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
 
     def test_summary_style_nonzero_members_refuses_before_seek(self):
         result = self.run_script("--yes", env={"FAKE_GROUP_MEMBERS": "1"})
@@ -326,7 +489,7 @@ exit 1
         preview_job_id = "00000000-0000-0000-0000-000000000001"
         new_job_id = "00000000-0000-0000-0000-000000000002"
         job_state = self.repo / "job-state"
-        job_state.write_text(f"{preview_job_id}\n", encoding="utf-8")
+        job_state.write_text(f"{preview_job_id}|live\n", encoding="utf-8")
 
         result = self.run_script(
             "--yes",
@@ -337,17 +500,52 @@ exit 1
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(job_state.read_text(encoding="utf-8"), f"{new_job_id}\n")
+        self.assertEqual(
+            job_state.read_text(encoding="utf-8"), f"{new_job_id}|live\n"
+        )
 
     def test_empty_frozen_target_deletion_leaves_state_file_empty(self):
         preview_job_id = "00000000-0000-0000-0000-000000000001"
         job_state = self.repo / "job-state"
-        job_state.write_text(f"{preview_job_id}\n", encoding="utf-8")
+        job_state.write_text(f"{preview_job_id}|live\n", encoding="utf-8")
 
         result = self.run_script("--yes", env={"FAKE_JOB_STATE": str(job_state)})
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(job_state.read_text(encoding="utf-8"), "")
+
+    def test_previewed_live_job_that_becomes_terminal_is_preserved_with_spool(self):
+        job_id = "00000000-0000-0000-0000-000000000001"
+        job_state = self.repo / "job-state"
+        job_state.write_text(f"{job_id}|live\n", encoding="utf-8")
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "terminal-race.pgn"
+        spool_file.write_text("preserve me", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_JOB_STATE": str(job_state),
+                "FAKE_RACE_TARGET_STATUS": "completed",
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/terminal-race.pgn",
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(job_state.read_text(encoding="utf-8"), f"{job_id}|completed\n")
+        self.assertTrue(spool_file.exists())
+        self.assertEqual(spool_file.read_text(encoding="utf-8"), "preserve me")
+        self.assertIn(
+            f"Skipped now-terminal target: {job_id} (status: completed)",
+            result.stdout,
+        )
+
+    def test_stale_filter_is_rechecked_for_the_locked_subset(self):
+        result = self.run_script("--yes", "--stale-minutes", "30")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = self.docker_log()
+        self.assertGreaterEqual(log.count("lease_expires_at < NOW()"), 2)
+        self.assertGreaterEqual(log.count("updated_at < NOW() - make_interval"), 2)
 
     def test_sql_failure_leaves_original_spool_file_in_place(self):
         spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
@@ -435,6 +633,28 @@ exit 1
             "Spool cleanup summary: deleted=0, already_absent=0, retained=1, errors=0",
             result.stdout,
         )
+
+    def test_replacement_after_confirmation_does_not_become_cleanup_baseline(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("confirmed identity", encoding="utf-8")
+        displaced_file = self.repo / "confirmed-original.pgn"
+
+        result = self.run_script(
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_REPLACE_BEFORE_SEEK_FILE": str(spool_file),
+                "FAKE_REPLACED_BEFORE_SEEK_FILE": str(displaced_file),
+                "FAKE_REPLACEMENT_CONTENT": "post-confirmation replacement",
+            },
+            input="CLEAR\n",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(displaced_file.read_text(encoding="utf-8"), "confirmed identity")
+        self.assertEqual(
+            spool_file.read_text(encoding="utf-8"), "post-confirmation replacement"
+        )
+        self.assertIn("Changed spool file retained", result.stdout)
 
     def test_only_frozen_manifest_entries_are_considered_for_cleanup(self):
         spool_root = self.repo / ".runtime" / "pgn-spool"
@@ -554,6 +774,157 @@ def uuid4():
         )
         self.assertIn("spool cleanup incomplete", result.stderr)
         self.assertNotIn("spool files were retained", result.stderr)
+
+    def test_large_spool_manifest_cleans_only_returned_job_ids(self):
+        spool_root = self.repo / ".runtime" / "pgn-spool"
+        preview_rows = self.repo / "preview-rows"
+        rows = []
+        targets = []
+        for index in range(300):
+            job_id = uuid.UUID(int=index + 1)
+            name = f"large-manifest-{index:04d}.pgn"
+            target = spool_root / name
+            target.write_text(str(index), encoding="utf-8")
+            targets.append(target)
+            rows.append(f"{job_id}|.runtime/pgn-spool/{name}|0\n")
+        preview_rows.write_text("".join(rows), encoding="utf-8")
+
+        result = self.run_script(
+            "--yes", env={"FAKE_PREVIEW_ROWS_FILE": str(preview_rows)}
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(target.exists() for target in targets))
+
+    def test_reports_remaining_terminal_counts_by_status_and_total(self):
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_TERMINAL_COMPLETED": "8",
+                "FAKE_TERMINAL_PARTIAL": "2",
+                "FAKE_TERMINAL_FAILED": "4",
+                "FAKE_TERMINAL_TOTAL": "14",
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "Remaining terminal jobs: completed=8, partial=2, failed=4, total=14",
+            result.stdout,
+        )
+
+    def test_terminal_reporting_failure_does_not_report_cleanup_success(self):
+        result = self.run_script(
+            "--yes", env={"FAKE_TERMINAL_REPORT_FAIL": "1"}
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("could not report remaining terminal analysis jobs", result.stderr)
+        self.assertNotIn("Unfinished analysis state cleared", result.stdout)
+
+    def test_postgres_transaction_preserves_target_that_races_to_terminal(self):
+        database_url = os.environ.get("TEST_DATABASE_URL", "").strip()
+        if not database_url:
+            self.skipTest("PostgreSQL integration test requires TEST_DATABASE_URL")
+
+        import sqlalchemy as sa
+        from alembic import command
+        from alembic.config import Config
+        from sqlalchemy.engine import make_url
+        from sqlalchemy.exc import OperationalError
+
+        if make_url(database_url).get_backend_name() != "postgresql":
+            self.fail("TEST_DATABASE_URL must use PostgreSQL")
+
+        source_root = Path(__file__).parents[2]
+        alembic_config = Config(str(source_root / "alembic.ini"))
+        alembic_config.set_main_option("sqlalchemy.url", database_url)
+        engine = sa.create_engine(database_url, pool_pre_ping=True)
+        try:
+            try:
+                command.upgrade(alembic_config, "head")
+            except OperationalError as error:
+                self.skipTest(f"PostgreSQL unavailable: {error}")
+
+            job_id = uuid.uuid4()
+            spool_file = self.repo / ".runtime" / "pgn-spool" / "race.pgn"
+            spool_file.write_text("terminal race", encoding="utf-8")
+            with engine.begin() as connection:
+                connection.execute(
+                    sa.text(
+                        """
+                        INSERT INTO analysis_jobs (
+                            id, source_type, source_name, spool_path, status
+                        ) VALUES (
+                            :id, 'file', 'race.pgn', :spool_path, 'live'
+                        )
+                        """
+                    ),
+                    {
+                        "id": job_id,
+                        "spool_path": ".runtime/pgn-spool/race.pgn",
+                    },
+                )
+
+            helper = self.repo / "real_psql.py"
+            helper.write_text(
+                """import os
+import sys
+
+import psycopg
+
+
+database_url = os.environ["FAKE_REAL_PSQL_DATABASE_URL"].replace(
+    "postgresql+psycopg://", "postgresql://", 1
+)
+with psycopg.connect(database_url, autocommit=True) as connection:
+    with connection.cursor() as cursor:
+        if sys.argv[1] == "race":
+            cursor.execute(
+                "UPDATE analysis_jobs SET status = 'completed', "
+                "completed_at = NOW(), updated_at = NOW() WHERE id = %s",
+                (os.environ["FAKE_REAL_RACE_JOB_ID"],),
+            )
+        else:
+            cursor.execute(sys.stdin.read())
+            while True:
+                if cursor.description is not None:
+                    for row in cursor.fetchall():
+                        print("|".join("" if value is None else str(value) for value in row))
+                if not cursor.nextset():
+                    break
+""",
+                encoding="utf-8",
+            )
+
+            result = self.run_script(
+                "--yes",
+                env={
+                    "FAKE_REAL_PSQL_DATABASE_URL": database_url,
+                    "FAKE_REAL_PSQL_HELPER": str(helper),
+                    "FAKE_REAL_PSQL_PYTHON": str(source_root / ".venv/bin/python"),
+                    "FAKE_REAL_RACE_JOB_ID": str(job_id),
+                },
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with engine.connect() as connection:
+                status = connection.scalar(
+                    sa.text("SELECT status FROM analysis_jobs WHERE id = :id"),
+                    {"id": job_id},
+                )
+            self.assertEqual(status, "completed")
+            self.assertTrue(spool_file.exists())
+        finally:
+            try:
+                if "job_id" in locals():
+                    with engine.begin() as connection:
+                        connection.execute(
+                            sa.text("DELETE FROM analysis_jobs WHERE id = :id"),
+                            {"id": job_id},
+                        )
+            finally:
+                engine.dispose()
 
     def test_static_runtime_symlink_aborts_before_kafka_seek(self):
         runtime = self.repo / ".runtime"

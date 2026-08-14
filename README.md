@@ -173,7 +173,7 @@ From the repository root, preview and clear all unfinished jobs (`queued`, `pars
 docker_help/clear_analysis_state.sh
 ```
 
-The command prints each target, then requires you to type `CLEAR`. Use `--yes` only when you have reviewed the impact and need non-interactive execution:
+The command prints each target, the current Kafka group and lag, and the number of exact spool-file identities it froze. The `CLEAR` prompt follows this destructive preview. Use `--yes` after you have reviewed the impact and need non-interactive execution:
 
 ```bash
 docker_help/clear_analysis_state.sh --yes
@@ -185,7 +185,7 @@ To target only unfinished jobs with an expired lease that have been unchanged fo
 docker_help/clear_analysis_state.sh --stale-minutes 30
 ```
 
-After cleanup, restart the stopped services and upload the PGN again to begin a new analysis.
+After cleanup, restart the stopped services and upload the PGN again to begin a new analysis. If a previewed job becomes `completed`, `partial`, or `failed` before the maintenance transaction locks it, the command reports the race and preserves both that job and its spool file. A successful run also prints the remaining terminal-job count for each status and in total.
 
 ## Configuration
 
