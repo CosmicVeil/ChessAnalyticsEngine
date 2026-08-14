@@ -45,7 +45,8 @@ if pgrep -f '(^|/)(python|python3)([0-9.]*)? -m webapp[.]ingestion_worker$' >/de
   fail 'ingestion worker is running; stop the app processes first'
 fi
 
-if pgrep -f '(^|/)go run [.]$' >/dev/null; then
+if pgrep -f '(^|/)go[[:space:]]+run[[:space:]]+([.]|[.]/cmd/extractor)([[:space:]]|$)' >/dev/null || \
+  pgrep -f '(^|/)go-build[^/[:space:]]*/[^/[:space:]]*/exe/processor([[:space:]]|$)' >/dev/null; then
   fail 'Go feature extractor is running; stop the app processes first'
 fi
 

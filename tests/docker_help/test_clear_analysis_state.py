@@ -50,6 +50,13 @@ set -euo pipefail
 if [[ \"${FAKE_ACTIVE_WORKER:-}\" == \"1\" && \"$*\" == *\"webapp\"* ]]; then
   exit 0
 fi
+pattern=''
+for argument in \"$@\"; do
+  pattern=\"$argument\"
+done
+if [[ -n \"${FAKE_PROCESS:-}\" && \"${FAKE_PROCESS}\" =~ $pattern ]]; then
+  exit 0
+fi
 exit 1
 """,
         )
@@ -114,6 +121,42 @@ exit 1
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ingestion worker is running", result.stderr)
         self.assertNotIn("group seek", self.docker_log())
+
+    def test_refuses_when_go_run_extractor_has_trailing_arguments(self):
+        result = self.run_script("--yes", env={"FAKE_PROCESS": "go run . --poll"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Go feature extractor is running", result.stderr)
+        self.assertEqual(self.docker_log(), "")
+
+    def test_refuses_when_go_run_extractor_targets_its_package(self):
+        result = self.run_script(
+            "--yes", env={"FAKE_PROCESS": "go run ./cmd/extractor --poll"}
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Go feature extractor is running", result.stderr)
+        self.assertEqual(self.docker_log(), "")
+
+    def test_refuses_when_compiled_go_build_processor_is_active(self):
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_PROCESS": "/private/var/folders/x/T/go-build123456789/b001/exe/processor"
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Go feature extractor is running", result.stderr)
+        self.assertEqual(self.docker_log(), "")
+
+    def test_allows_unrelated_go_command(self):
+        result = self.run_script(
+            "--yes", env={"FAKE_PROCESS": "go run ./cmd/unrelated --poll"}
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Safety checks passed.", result.stdout)
 
 
 if __name__ == "__main__":
