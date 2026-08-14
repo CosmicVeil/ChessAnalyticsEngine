@@ -338,6 +338,7 @@ def cleanup(repo_root, manifest):
             os.rmdir(quarantine, dir_fd=spool_fd)
         except OSError as error:
             quarantine_retained = True
+            errors += 1
             print(
                 "Private spool cleanup directory retained at "
                 f".runtime/pgn-spool/{quarantine}: {error}"
@@ -348,7 +349,8 @@ def cleanup(repo_root, manifest):
     print(
         "Spool cleanup summary: "
         f"deleted={deleted}, already_absent={already_absent}, "
-        f"retained={retained}, errors={errors}"
+        f"retained={retained}, errors={errors}, "
+        f"recovery_directories={int(quarantine_retained)}"
     )
     if retained or errors or quarantine_retained:
         raise SystemExit(1)

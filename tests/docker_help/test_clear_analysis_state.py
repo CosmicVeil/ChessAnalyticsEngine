@@ -456,6 +456,64 @@ exit 1
         self.assertTrue(injected.exists())
         self.assertEqual(injected.read_text(encoding="utf-8"), "injected")
 
+    def test_retained_private_recovery_directory_is_counted_as_an_error(self):
+        spool_root = self.repo / ".runtime" / "pgn-spool"
+        target = spool_root / "temporary.pgn"
+        target.write_text("target", encoding="utf-8")
+        (self.repo / "uuid.py").write_text(
+            """import os
+
+
+_calls = 0
+
+
+class FakeUuid:
+    def __init__(self, value):
+        self.hex = value
+
+
+def uuid4():
+    global _calls
+    _calls += 1
+    if _calls == 2:
+        quarantine = os.path.join(
+            os.environ["FAKE_SPOOL_ROOT"], f".cleanup-{1:032x}"
+        )
+        with open(
+            os.path.join(quarantine, "not-in-manifest.pgn"),
+            "w",
+            encoding="utf-8",
+        ) as injected:
+            injected.write("injected")
+    return FakeUuid(f"{_calls:032x}")
+""",
+            encoding="utf-8",
+        )
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_SPOOL_ROOT": str(spool_root),
+            },
+        )
+
+        recovery_directories = list(spool_root.glob(".cleanup-*"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(target.exists())
+        self.assertEqual(len(recovery_directories), 1)
+        self.assertEqual(
+            (recovery_directories[0] / "not-in-manifest.pgn").read_text(
+                encoding="utf-8"
+            ),
+            "injected",
+        )
+        self.assertIn(
+            "Spool cleanup summary: deleted=1, already_absent=0, retained=0, "
+            "errors=1, recovery_directories=1",
+            result.stdout,
+        )
+
     def test_partial_cleanup_reports_deleted_and_retained_counts(self):
         spool_root = self.repo / ".runtime" / "pgn-spool"
         first = spool_root / "first.pgn"
