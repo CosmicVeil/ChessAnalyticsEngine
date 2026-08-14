@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import uuid
+import uuid, requests, os
 
 from flask import Blueprint, Response, current_app, jsonify, request, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -15,7 +15,7 @@ from webapp.sse import stream_events
 
 
 api = Blueprint("api", __name__, url_prefix="/api")
-
+LICHESS_API_KEY = os.environ.get("LICHESS_API_KEY")
 
 def _dependencies() -> WebDependencies:
     return current_app.extensions["web_dependencies"]
@@ -47,12 +47,24 @@ def create_analysis():
             400,
         )
     if has_lichess:
-        return _error(
-            "connector_unavailable",
-            "Lichess Study import is reserved for a future connector.",
-            501,
-            url=lichess_url.strip(),
-        )
+        # return _error(
+        #     "connector_unavailable",
+        #     "Lichess Study import is reserved for a future connector.",
+        #     501,
+        #     url=lichess_url.strip(),
+        # )
+
+        try:
+
+            liches_api_url = lichess_url[0:lichess_url.find('g')+2]+"api/"+lichess_url[lichess_url.find('g')+2:]+".pgn"
+
+            response = requests.get(liches_api_url, headers={
+                "Authorization": LICHESS_API_KEY
+            })
+            pasted = response.text
+        except:
+            return _error()
+
 
     dependencies = _dependencies()
     spool = dependencies.spool_service
