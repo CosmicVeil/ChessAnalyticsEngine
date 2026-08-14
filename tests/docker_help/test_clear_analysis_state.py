@@ -18,6 +18,7 @@ class ClearAnalysisStateCommandTests(unittest.TestCase):
         (self.repo / "docker_help").mkdir()
         (self.repo / "infra").mkdir()
         (self.repo / "bin").mkdir()
+        (self.repo / ".runtime" / "pgn-spool").mkdir(parents=True)
         (self.repo / "infra" / "docker-compose.yaml").write_text(
             "services: {}\n", encoding="utf-8"
         )
@@ -39,6 +40,23 @@ if [[ \"$*\" == *\"config --services\"* ]]; then
     printf 'postgres\\n'
   else
     printf 'postgres\\nredpanda-0\\n'
+  fi
+fi
+if [[ \"$*\" == *\"rpk group describe chess-state-managers\"* ]]; then
+  printf 'GROUP                 MEMBERS\\nchess-state-managers  %s\\n' \"${FAKE_GROUP_MEMBERS:-0}\"
+fi
+if [[ \"$*\" == *\"rpk group seek chess-state-managers\"* ]]; then
+  if [[ \"${FAKE_KAFKA_SEEK_FAIL:-}\" == \"1\" ]]; then
+    exit 23
+  fi
+fi
+if [[ \"$*\" == *\"psql\"* ]]; then
+  sql=\"$(cat)\"
+  if [[ -n \"$sql\" ]]; then
+    printf 'SQL:%s\\n' \"$sql\" >> \"${FAKE_DOCKER_LOG:?}\"
+  fi
+  if [[ \"$sql\" == *\"spool_path\"* && \"$sql\" != *\"CREATE TEMPORARY TABLE\"* ]]; then
+    printf '00000000-0000-0000-0000-000000000001|%s|%s\\n' \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
   fi
 fi
 """,
@@ -66,7 +84,7 @@ exit 1
         command.write_text(contents, encoding="utf-8")
         command.chmod(command.stat().st_mode | stat.S_IXUSR)
 
-    def run_script(self, *args, env=None):
+    def run_script(self, *args, env=None, input=None):
         command_env = os.environ.copy()
         command_env.update(
             {
@@ -82,6 +100,7 @@ exit 1
             env=command_env,
             capture_output=True,
             text=True,
+            input=input,
             check=False,
         )
 
@@ -157,6 +176,85 @@ exit 1
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("Safety checks passed.", result.stdout)
+
+    def test_confirmation_refusal_causes_no_kafka_seek(self):
+        result = self.run_script(input="no\n")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("confirmation", result.stderr)
+        self.assertNotIn("group seek", self.docker_log())
+
+    def test_preview_shows_each_target_spool_path_and_game_count(self):
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_GAME_COUNT": "3",
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "Target job: 00000000-0000-0000-0000-000000000001 "
+            "(games: 3; spool: .runtime/pgn-spool/temporary.pgn)",
+            result.stdout,
+        )
+
+    def test_active_kafka_group_member_refuses_cleanup(self):
+        result = self.run_script("--yes", env={"FAKE_GROUP_MEMBERS": "1"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("active members", result.stderr)
+        self.assertNotIn("group seek", self.docker_log())
+        self.assertNotIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
+
+    def test_kafka_seek_failure_causes_no_cleanup_sql(self):
+        result = self.run_script("--yes", env={"FAKE_KAFKA_SEEK_FAIL": "1"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Kafka group seek failed", result.stderr)
+        self.assertIn("group seek", self.docker_log())
+        self.assertNotIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
+
+    def test_success_seeks_before_cleanup_sql_and_removes_valid_spool_file(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes", env={"FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn"}
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(spool_file.exists())
+        log = self.docker_log()
+        self.assertLess(
+            log.index("group seek chess-state-managers"),
+            log.index("CREATE TEMPORARY TABLE cleanup_targets"),
+        )
+
+    def test_unsafe_spool_path_aborts_before_kafka_seek(self):
+        outside = self.repo / "outside.pgn"
+        outside.write_text("data", encoding="utf-8")
+
+        result = self.run_script("--yes", env={"FAKE_SPOOL_PATH": "../outside.pgn"})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(outside.exists())
+        self.assertNotIn("group seek", self.docker_log())
+
+    def test_symlinked_spool_path_aborts_before_kafka_seek(self):
+        outside = self.repo / "outside.pgn"
+        outside.write_text("data", encoding="utf-8")
+        symlink = self.repo / ".runtime" / "pgn-spool" / "linked.pgn"
+        symlink.symlink_to(outside)
+
+        result = self.run_script(
+            "--yes", env={"FAKE_SPOOL_PATH": ".runtime/pgn-spool/linked.pgn"}
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(outside.exists())
+        self.assertNotIn("group seek", self.docker_log())
 
 
 if __name__ == "__main__":
