@@ -65,6 +65,7 @@ if [[ \"$*\" == *\"psql\"* ]]; then
         : > \"${FAKE_JOB_STATE}\"
       else
         state_tmp=\"${FAKE_JOB_STATE}.tmp\"
+        : > \"$state_tmp\"
         while IFS= read -r state_job_id; do
           if [[ \"$sql\" != *\"('$state_job_id'::uuid)\"* ]]; then
             printf '%s\\n' \"$state_job_id\" >> \"$state_tmp\"
@@ -285,6 +286,16 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(job_state.read_text(encoding="utf-8"), f"{new_job_id}\n")
 
+    def test_empty_frozen_target_deletion_leaves_state_file_empty(self):
+        preview_job_id = "00000000-0000-0000-0000-000000000001"
+        job_state = self.repo / "job-state"
+        job_state.write_text(f"{preview_job_id}\n", encoding="utf-8")
+
+        result = self.run_script("--yes", env={"FAKE_JOB_STATE": str(job_state)})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(job_state.read_text(encoding="utf-8"), "")
+
     def test_sql_failure_retains_validated_spool_file(self):
         spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
         spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
@@ -322,9 +333,26 @@ exit 1
             },
         )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(result.returncode, 0)
         self.assertTrue(outside_file.exists())
         self.assertFalse((self.repo / ".runtime" / "held-spool" / "temporary.pgn").exists())
+        self.assertTrue(any((self.repo / ".runtime" / "held-spool").iterdir()))
+
+    def test_kafka_seek_failure_restores_quarantined_spool_file(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_KAFKA_SEEK_FAIL": "1",
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(spool_file.exists())
+        self.assertFalse(list((self.repo / ".runtime" / "pgn-spool").glob(".cleanup-*")))
 
     def test_static_runtime_symlink_aborts_before_kafka_seek(self):
         runtime = self.repo / ".runtime"
