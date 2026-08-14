@@ -43,9 +43,13 @@ if [[ \"$*\" == *\"config --services\"* ]]; then
   fi
 fi
 if [[ \"$*\" == *\"rpk group describe chess-state-managers\"* ]]; then
-  printf 'GROUP                 MEMBERS\\nchess-state-managers  %s\\n' \"${FAKE_GROUP_MEMBERS:-0}\"
+  printf 'GROUP chess-state-managers\\nMEMBERS %s\\n' \"${FAKE_GROUP_MEMBERS:-0}\"
 fi
 if [[ \"$*\" == *\"rpk group seek chess-state-managers\"* ]]; then
+  if [[ \"${FAKE_SWAP_SPOOL_ROOT:-}\" == \"1\" ]]; then
+    mv \"${FAKE_SPOOL_ROOT:?}\" \"${FAKE_HELD_SPOOL_ROOT:?}\"
+    ln -s \"${FAKE_OUTSIDE_SPOOL_ROOT:?}\" \"${FAKE_SPOOL_ROOT:?}\"
+  fi
   if [[ \"${FAKE_KAFKA_SEEK_FAIL:-}\" == \"1\" ]]; then
     exit 23
   fi
@@ -55,8 +59,19 @@ if [[ \"$*\" == *\"psql\"* ]]; then
   if [[ -n \"$sql\" ]]; then
     printf 'SQL:%s\\n' \"$sql\" >> \"${FAKE_DOCKER_LOG:?}\"
   fi
+  if [[ \"$sql\" == *\"CREATE TEMPORARY TABLE cleanup_targets\"* ]]; then
+    if [[ -n \"${FAKE_NEW_JOB_ID:-}\" && \"$sql\" == *\"WHERE status IN\"* ]]; then
+      printf 'NEW_JOB_MUTATED:%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_DOCKER_LOG:?}\"
+    fi
+    if [[ \"${FAKE_SQL_FAIL:-}\" == \"1\" ]]; then
+      exit 24
+    fi
+  fi
   if [[ \"$sql\" == *\"spool_path\"* && \"$sql\" != *\"CREATE TEMPORARY TABLE\"* ]]; then
     printf '00000000-0000-0000-0000-000000000001|%s|%s\\n' \"${FAKE_SPOOL_PATH:-}\" \"${FAKE_GAME_COUNT:-0}\"
+    if [[ -n \"${FAKE_NEW_JOB_ID:-}\" ]]; then
+      printf 'NEW_JOB_APPEARED:%s\\n' \"${FAKE_NEW_JOB_ID}\" >> \"${FAKE_DOCKER_LOG:?}\"
+    fi
   fi
 fi
 """,
@@ -200,7 +215,14 @@ exit 1
             result.stdout,
         )
 
-    def test_active_kafka_group_member_refuses_cleanup(self):
+    def test_summary_style_zero_members_allows_cleanup(self):
+        result = self.run_script("--yes")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GROUP chess-state-managers\nMEMBERS 0", result.stdout)
+        self.assertIn("group seek chess-state-managers", self.docker_log())
+
+    def test_summary_style_nonzero_members_refuses_before_seek(self):
         result = self.run_script("--yes", env={"FAKE_GROUP_MEMBERS": "1"})
 
         self.assertNotEqual(result.returncode, 0)
@@ -231,6 +253,59 @@ exit 1
             log.index("group seek chess-state-managers"),
             log.index("CREATE TEMPORARY TABLE cleanup_targets"),
         )
+
+    def test_new_job_after_preview_is_not_mutated_by_cleanup_sql(self):
+        new_job_id = "00000000-0000-0000-0000-000000000002"
+
+        result = self.run_script("--yes", env={"FAKE_NEW_JOB_ID": new_job_id})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"NEW_JOB_APPEARED:{new_job_id}", self.docker_log())
+        self.assertNotIn(f"NEW_JOB_MUTATED:{new_job_id}", self.docker_log())
+        cleanup_sql = self.docker_log().split("CREATE TEMPORARY TABLE cleanup_targets", 1)[1]
+        self.assertIn("00000000-0000-0000-0000-000000000001", cleanup_sql)
+        self.assertNotIn(new_job_id, cleanup_sql)
+
+    def test_sql_failure_retains_validated_spool_file(self):
+        spool_file = self.repo / ".runtime" / "pgn-spool" / "temporary.pgn"
+        spool_file.write_text("[Event \\\"Temporary\\\"]", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_SQL_FAIL": "1",
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(spool_file.exists())
+        self.assertIn("group seek chess-state-managers", self.docker_log())
+        self.assertIn("CREATE TEMPORARY TABLE cleanup_targets", self.docker_log())
+
+    def test_spool_parent_swap_after_seek_cannot_delete_outside_file(self):
+        spool_root = self.repo / ".runtime" / "pgn-spool"
+        spool_file = spool_root / "temporary.pgn"
+        spool_file.write_text("safe", encoding="utf-8")
+        outside_root = self.repo / "outside-spool"
+        outside_root.mkdir()
+        outside_file = outside_root / "temporary.pgn"
+        outside_file.write_text("outside", encoding="utf-8")
+
+        result = self.run_script(
+            "--yes",
+            env={
+                "FAKE_SPOOL_PATH": ".runtime/pgn-spool/temporary.pgn",
+                "FAKE_SWAP_SPOOL_ROOT": "1",
+                "FAKE_SPOOL_ROOT": str(spool_root),
+                "FAKE_HELD_SPOOL_ROOT": str(self.repo / ".runtime" / "held-spool"),
+                "FAKE_OUTSIDE_SPOOL_ROOT": str(outside_root),
+            },
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(outside_file.exists())
+        self.assertFalse((self.repo / ".runtime" / "held-spool" / "temporary.pgn").exists())
 
     def test_unsafe_spool_path_aborts_before_kafka_seek(self):
         outside = self.repo / "outside.pgn"

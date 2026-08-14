@@ -93,9 +93,14 @@ if ! target_rows="$(run_psql -At -F '|' <<<"$preview_sql")"; then
   fail 'could not preview unfinished analysis jobs'
 fi
 
-validated_spool_paths=''
+target_values=''
+validated_spool_basenames=''
+spool_directory=''
 while IFS='|' read -r job_id spool_path game_count; do
   [[ -n "$job_id" ]] || continue
+  [[ "$job_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]] || \
+    fail "unsafe target job id: $job_id"
+  target_values+="${target_values:+, }('$job_id'::uuid)"
   printf 'Target job: %s (games: %s%s)\n' \
     "$job_id" "${game_count:-0}" "${spool_path:+; spool: $spool_path}"
 
@@ -110,29 +115,18 @@ while IFS='|' read -r job_id spool_path game_count; do
     *) fail "unsafe spool path: $spool_path" ;;
   esac
 
-  [[ -d "$spool_root" && ! -L "$spool_root" ]] || fail "unsafe spool directory: $spool_root"
-  relative_path="${candidate_path#"$repo_root"/}"
-  current_path="$repo_root"
-  IFS=/ read -r -a path_components <<<"$relative_path"
-  for path_component in "${path_components[@]}"; do
-    [[ "$path_component" != '.' && "$path_component" != '..' ]] || fail "unsafe spool path: $spool_path"
-    current_path="$current_path/$path_component"
-    [[ ! -L "$current_path" ]] || fail "unsafe spool path: $spool_path"
-  done
-
-  resolved_directory="$(cd -P -- "$(dirname -- "$candidate_path")" 2>/dev/null && pwd -P)" || \
-    fail "unsafe spool path: $spool_path"
-  resolved_path="$resolved_directory/$(basename -- "$candidate_path")"
-  spool_root_real="$(cd -P -- "$spool_root" 2>/dev/null && pwd -P)" || \
-    fail "unsafe spool directory: $spool_root"
-  case "$resolved_path" in
-    "$spool_root_real"/*) ;;
-    *) fail "unsafe spool path: $spool_path" ;;
-  esac
-  [[ ! -L "$candidate_path" ]] || fail "unsafe spool path: $spool_path"
-  if [[ -e "$candidate_path" ]]; then
-    [[ -f "$candidate_path" ]] || fail "unsafe spool path: $spool_path"
-    validated_spool_paths+="$resolved_path"$'\n'
+  [[ "$(dirname -- "$candidate_path")" == "$spool_root" ]] || fail "unsafe spool path: $spool_path"
+  spool_basename="$(basename -- "$candidate_path")"
+  [[ "$spool_basename" != '.' && "$spool_basename" != '..' ]] || fail "unsafe spool path: $spool_path"
+  if [[ -z "$spool_directory" ]]; then
+    [[ -d "$spool_root" && ! -L "$spool_root" ]] || fail "unsafe spool directory: $spool_root"
+    cd -P -- "$spool_root" || fail "unsafe spool directory: $spool_root"
+    spool_directory="$PWD"
+  fi
+  [[ ! -L "$spool_basename" ]] || fail "unsafe spool path: $spool_path"
+  if [[ -e "$spool_basename" ]]; then
+    [[ -f "$spool_basename" ]] || fail "unsafe spool path: $spool_path"
+    validated_spool_basenames+="$spool_basename"$'\n'
   fi
 done <<<"$target_rows"
 
@@ -149,28 +143,26 @@ if ! group_description="$(docker compose -f "$compose_file" exec -T redpanda-0 \
 fi
 printf '%s\n' "$group_description"
 group_members="$(printf '%s\n' "$group_description" | awk '
-  /MEMBERS/ {
-    for (column = 1; column <= NF; column++) {
-      if ($column == "MEMBERS") members_column = column
-    }
-    next
-  }
-  members_column && $1 == "chess-state-managers" { print $members_column; exit }
+  $1 == "MEMBERS" && NF == 2 { print $2; exit }
 ')"
-[[ "$group_members" == '0' ]] || fail 'Kafka group has active members; stop the application first'
+[[ "$group_members" =~ ^[0-9]+$ && "$group_members" == '0' ]] || \
+  fail 'Kafka group has active members; stop the application first'
 
 if ! docker compose -f "$compose_file" exec -T redpanda-0 \
   rpk group seek chess-state-managers --to end --topics chess-moves; then
   fail 'Kafka group seek failed; PostgreSQL was not changed'
 fi
 
+if [[ -n "$target_values" ]]; then
+  target_insert_sql="INSERT INTO cleanup_targets (id) VALUES $target_values;"
+else
+  target_insert_sql='INSERT INTO cleanup_targets (id) SELECT NULL::uuid WHERE FALSE;'
+fi
+
 maintenance_sql="
 BEGIN;
 CREATE TEMPORARY TABLE cleanup_targets (id uuid PRIMARY KEY) ON COMMIT DROP;
-INSERT INTO cleanup_targets (id)
-SELECT id
-FROM analysis_jobs
-WHERE $target_predicate;
+$target_insert_sql
 
 SET LOCAL session_replication_role = replica;
 DELETE FROM unmatched_results
@@ -235,12 +227,12 @@ if ! run_psql <<<"$maintenance_sql"; then
   fail 'analysis cleanup transaction failed; spool files were retained'
 fi
 
-if [[ -n "$validated_spool_paths" ]]; then
-  while IFS= read -r spool_path; do
-    if [[ -f "$spool_path" && ! -L "$spool_path" ]]; then
-      rm -- "$spool_path"
+if [[ -n "$validated_spool_basenames" ]]; then
+  while IFS= read -r spool_basename; do
+    if [[ -f "$spool_basename" && ! -L "$spool_basename" ]]; then
+      rm -- "$spool_basename"
     fi
-  done <<<"$validated_spool_paths"
+  done <<<"$validated_spool_basenames"
 fi
 
 printf '%s\n' 'Unfinished analysis state cleared. Restart services and upload again.'
