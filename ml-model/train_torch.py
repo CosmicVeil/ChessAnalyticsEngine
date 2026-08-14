@@ -73,6 +73,7 @@ def main() -> None:
     save_feature_schema(features.columns.tolist())
     model_cpu = model.to("cpu")
     pytorch_path = model_artifact_path("pytorch_model.pt")
+
     # Save the PyTorch weights and input size for the live inference consumer.
     torch.save(
         {
