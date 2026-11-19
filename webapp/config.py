@@ -12,6 +12,10 @@ DEFAULT_PGN_SPOOL_DIRECTORY = Path(".runtime/pgn-spool")
 DEFAULT_MAX_PGN_UPLOAD_BYTES = 4 * 1024**3
 DEFAULT_MAX_PASTED_PGN_BYTES = 10 * 1024**2
 DEFAULT_SECRET_KEY = "development-only-change-me"
+DEFAULT_SIGN_IN_ATTEMPTS_PER_15_MIN = 20
+DEFAULT_ACCOUNT_CREATIONS_PER_HOUR = 10
+DEFAULT_ANALYSES_PER_HOUR = 20
+DEFAULT_MAX_ACTIVE_ANALYSES = 3
 
 
 def _read_text(
@@ -68,6 +72,14 @@ class Settings:
     secret_key: str = DEFAULT_SECRET_KEY
     lichess_api_token: str = ""
     session_cookie_secure: bool = False
+    # Only safe behind a proxy that overwrites X-Forwarded-For (Caddy does);
+    # otherwise any client could pick its own rate-limit identity.
+    trust_proxy_headers: bool = False
+    rate_limits_enabled: bool = True
+    sign_in_attempts_per_15_min: int = DEFAULT_SIGN_IN_ATTEMPTS_PER_15_MIN
+    account_creations_per_hour: int = DEFAULT_ACCOUNT_CREATIONS_PER_HOUR
+    analyses_per_hour: int = DEFAULT_ANALYSES_PER_HOUR
+    max_active_analyses: int = DEFAULT_MAX_ACTIVE_ANALYSES
 
     @classmethod
     def from_env(
@@ -103,5 +115,27 @@ class Settings:
             lichess_api_token=_read_text(source, "LICHESS_API_TOKEN", ""),
             session_cookie_secure=_read_boolean(
                 source, "SESSION_COOKIE_SECURE", False
+            ),
+            trust_proxy_headers=_read_boolean(
+                source, "TRUST_PROXY_HEADERS", False
+            ),
+            rate_limits_enabled=_read_boolean(
+                source, "RATE_LIMITS_ENABLED", True
+            ),
+            sign_in_attempts_per_15_min=_read_positive_integer(
+                source,
+                "SIGN_IN_ATTEMPTS_PER_15_MIN",
+                DEFAULT_SIGN_IN_ATTEMPTS_PER_15_MIN,
+            ),
+            account_creations_per_hour=_read_positive_integer(
+                source,
+                "ACCOUNT_CREATIONS_PER_HOUR",
+                DEFAULT_ACCOUNT_CREATIONS_PER_HOUR,
+            ),
+            analyses_per_hour=_read_positive_integer(
+                source, "ANALYSES_PER_HOUR", DEFAULT_ANALYSES_PER_HOUR
+            ),
+            max_active_analyses=_read_positive_integer(
+                source, "MAX_ACTIVE_ANALYSES", DEFAULT_MAX_ACTIVE_ANALYSES
             ),
         )

@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from webapp.domain import (
+    AnalysisQuotaUsage,
     ClaimedJob,
     GameQuery,
     GameSnapshot,
@@ -311,6 +312,14 @@ class FakeAnalysisStore:
             key=lambda job: (job.created_at, job.id),
             reverse=True,
         )[:limit])
+
+    def analysis_quota_usage(
+        self, owner_id: uuid.UUID, since: datetime
+    ) -> AnalysisQuotaUsage:
+        owned = [job for job in self.jobs.values() if job.owner_id == owner_id]
+        recent = [job.created_at for job in owned if job.created_at >= since]
+        active = [job for job in owned if job.status not in TERMINAL_STATUSES]
+        return AnalysisQuotaUsage(len(recent), len(active), min(recent, default=None))
 
     def latest_event_id(self, job_id: uuid.UUID) -> int:
         return max(

@@ -14,3 +14,6 @@ ml-model/models/
 
 # Local secrets (compose reads .env for SECRET_KEY, POSTGRES_PASSWORD, DOMAIN)
 .env
+
+# Production pg_dump output (compose.prod.yaml postgres-backup service)
+backups/
