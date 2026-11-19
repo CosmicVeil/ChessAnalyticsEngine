@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from webapp.domain import SpooledSource
-from webapp.spool import SourceTooLarge, SpoolService
+from webapp.spool import SourceTooLarge, SpoolService, describe_byte_limit
 
 
 class ChunkOnlyStream:
@@ -122,6 +122,14 @@ class SpoolServiceTests(unittest.TestCase):
             spool_service(root).spool_text("1. e4 *")
 
             self.assertEqual(stat.S_IMODE(root.stat().st_mode), 0o700)
+
+
+class DescribeByteLimitTests(unittest.TestCase):
+    def test_whole_mebibytes_and_odd_sizes(self):
+        self.assertEqual(describe_byte_limit(20 * 1024**2), "20 MiB")
+        self.assertEqual(describe_byte_limit(10 * 1024**2), "10 MiB")
+        self.assertEqual(describe_byte_limit(1024), "1,024 bytes")
+        self.assertEqual(describe_byte_limit(20 * 1024**2 + 1), "20,971,521 bytes")
 
 
 if __name__ == "__main__":

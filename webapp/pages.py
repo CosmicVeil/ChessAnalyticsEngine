@@ -6,6 +6,7 @@ from flask import Blueprint, abort, current_app, g, render_template, request
 
 from webapp.auth import login_required, owns_job, valid_csrf
 from webapp.models import ANALYSIS_ENGINES
+from webapp.spool import describe_byte_limit
 
 
 pages = Blueprint("pages", __name__)
@@ -19,7 +20,13 @@ def landing():
 @pages.get("/analyze")
 @login_required
 def analyze():
-    return render_template("analyze.html", job_id=None)
+    max_upload_bytes = current_app.config["MAX_PGN_UPLOAD_BYTES"]
+    return render_template(
+        "analyze.html",
+        job_id=None,
+        max_upload_bytes=max_upload_bytes,
+        max_upload_label=describe_byte_limit(max_upload_bytes),
+    )
 
 
 @pages.get("/evaluation")

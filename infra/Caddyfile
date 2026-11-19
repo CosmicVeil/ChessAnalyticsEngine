@@ -9,6 +9,13 @@
 		-Server
 	}
 
+	# Backstop for the app's 20 MiB upload limit (MAX_PGN_UPLOAD_BYTES): reject
+	# huge bodies before they reach Flask. Kept above the app limit plus
+	# multipart overhead so Flask's own JSON error wins for borderline sizes.
+	request_body {
+		max_size 21MiB
+	}
+
 	reverse_proxy web:5000 {
 		# Send bytes immediately: SSE results must not sit in a proxy buffer.
 		flush_interval -1

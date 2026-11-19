@@ -89,11 +89,17 @@ if (form) {
   let liveController;
 
   const fileInput = form.elements.pgn_file;
+  // Server-rendered from MAX_PGN_UPLOAD_BYTES so the UI never drifts from config.
+  const maxUploadBytes = Number(form.dataset.maxUploadBytes);
+  const maxUploadLabel = form.dataset.maxUploadLabel;
+  const tooLargeMessage = `PGN files can be at most ${maxUploadLabel}.`;
+  const fileTooLarge = (file) => Boolean(file) && maxUploadBytes > 0 && file.size > maxUploadBytes;
   const fileLabel = document.querySelector("[data-file-label]");
   const dropZone = document.querySelector("[data-drop-zone]");
   const updateFileLabel = () => {
     const file = fileInput.files[0];
     fileLabel.textContent = file ? `${file.name} · ${formatBytes(file.size)}` : "Drop a batch file here";
+    status.textContent = fileTooLarge(file) ? tooLargeMessage : "";
   };
   fileInput.addEventListener("change", updateFileLabel);
   for (const eventName of ["dragenter", "dragover"]) {
@@ -116,7 +122,6 @@ if (form) {
     transfer.items.add(file);
     fileInput.files = transfer.files;
     updateFileLabel();
-    status.textContent = "";
   });
 
   const textarea = form.elements.pgn_text;
@@ -126,6 +131,11 @@ if (form) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     status.textContent = "";
+    // Fail fast instead of streaming a file the server will reject anyway.
+    if (sourceTabs.mode === "file" && fileTooLarge(fileInput.files[0])) {
+      status.textContent = tooLargeMessage;
+      return;
+    }
     const data = new FormData();
     data.append("engine", form.elements.engine.value);
     data.append("csrf_token", form.elements.csrf_token.value);
@@ -137,7 +147,9 @@ if (form) {
     status.textContent = "Stamping source and opening a durable job…";
     try {
       const response = await fetch("/api/analyses", { method: "POST", body: data });
-      const body = await response.json();
+      // The proxy's own 413 has no JSON body, so don't let parsing mask it.
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 413 && !body.error) throw new Error(tooLargeMessage);
       if (!response.ok) throw new Error(body.error?.message || "The source was not accepted.");
       status.textContent = "Accepted. Opening the live ledger…";
       liveController?.close();

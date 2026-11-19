@@ -176,6 +176,7 @@ The whole stack fits on one Linux VM with Docker (4 vCPU / 8 GB minimum: Stockfi
 - **Caddy** (`infra/Caddyfile`) is the only service with public ports (80/443). It obtains a Let's Encrypt certificate for `DOMAIN`, redirects HTTP to HTTPS, and proxies to Flask without buffering so SSE updates arrive immediately.
 - **gunicorn** (`gthread`, 2 workers x 16 threads) replaces the Flask dev server. Each open live-results stream holds one thread, so threads bound concurrent viewers.
 - PostgreSQL, Redpanda, and Flask publish **no host ports**. The Redpanda console starts only with `--profile debug`, bound to `127.0.0.1:8080`; reach it with `ssh -L 8080:localhost:8080 <server>`.
+- PGN file uploads are capped at **20 MiB** (`MAX_PGN_UPLOAD_BYTES`), so one visitor can't fill the disk or monopolise Stockfish. Caddy rejects request bodies over 21 MiB as a backstop; anything between is answered by Flask with a JSON `413 source_too_large` error that the upload form shows, and the form checks the file size before sending.
 - `SECRET_KEY` and `POSTGRES_PASSWORD` have **no fallbacks**: compose refuses to start without them. Session cookies are marked `Secure`.
 
 On the server, point the domain's DNS A record at it, open ports 80 and 443, copy trained artifacts into `ml-model/models/`, then create `.env` (git-ignored) next to `compose.yaml`:
@@ -304,7 +305,7 @@ After cleanup, restart the stopped services and upload the PGN again to begin a 
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka/Redpanda brokers | `localhost:19092` |
 | `KAFKA_WEB_RESULT_GROUP` | Web result consumer group | `chess-web-results-v1` |
 | `PGN_SPOOL_DIRECTORY` | Private temporary PGN storage | `.runtime/pgn-spool` |
-| `MAX_PGN_UPLOAD_BYTES` | File upload limit | 4 GiB |
+| `MAX_PGN_UPLOAD_BYTES` | File upload limit (also used for Lichess Study downloads) | 20 MiB |
 | `MAX_PASTED_PGN_BYTES` | Pasted-text limit | 10 MiB |
 | `SECRET_KEY` | Flask secret | development value only |
 | `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only (`true`/`false`); `compose.prod.yaml` sets `true` | `false` |

@@ -45,7 +45,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.kafka_bootstrap_servers, "localhost:19092")
         self.assertEqual(settings.kafka_web_result_group, "chess-web-results-v1")
         self.assertEqual(settings.pgn_spool_directory, Path(".runtime/pgn-spool"))
-        self.assertEqual(settings.max_pgn_upload_bytes, 4 * 1024**3)
+        self.assertEqual(settings.max_pgn_upload_bytes, 20 * 1024**2)
         self.assertEqual(settings.max_pasted_pgn_bytes, 10 * 1024**2)
         self.assertEqual(settings.secret_key, "development-only-change-me")
         self.assertFalse(settings.session_cookie_secure)

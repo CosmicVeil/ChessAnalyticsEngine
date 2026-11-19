@@ -18,7 +18,7 @@ from webapp.lichess import (
 )
 from webapp.pgn import iter_pgn_games
 from webapp.services import health_view
-from webapp.spool import SourceTooLarge
+from webapp.spool import SourceTooLarge, describe_byte_limit
 from webapp.sse import stream_events
 from webapp.auth import login_required, owns_job, valid_csrf
 from webapp.models import ANALYSIS_ENGINES
@@ -37,7 +37,15 @@ def _error(code: str, message: str, status: int, **details):
 
 @api.app_errorhandler(RequestEntityTooLarge)
 def request_too_large(_error_value):
-    return _error("source_too_large", "The submitted PGN exceeds the configured limit.", 413)
+    # Werkzeug raises this from MAX_CONTENT_LENGTH before the view runs, so
+    # answer with the same JSON shape as the spool's own size check.
+    limit = current_app.config["MAX_PGN_UPLOAD_BYTES"]
+    return _error(
+        "source_too_large",
+        f"PGN files can be at most {describe_byte_limit(limit)}.",
+        413,
+        limit=limit,
+    )
 
 
 @api.post("/analyses")

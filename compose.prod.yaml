@@ -18,6 +18,8 @@ x-prod-env: &prod-env
   DATABASE_URL: postgresql+psycopg://chess:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/chess_analytics
   SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
   SESSION_COOKIE_SECURE: "true"
+  # 20 MiB: bounds disk use and Stockfish time per upload on the public site.
+  MAX_PGN_UPLOAD_BYTES: "20971520"
 
 services:
   postgres:

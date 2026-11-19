@@ -4,6 +4,7 @@ from flask import Flask
 
 from webapp.config import Settings
 from webapp.domain import WebDependencies
+from webapp.spool import MULTIPART_OVERHEAD_BYTES
 
 
 def create_app(
@@ -23,7 +24,12 @@ def create_app(
         KAFKA_BOOTSTRAP_SERVERS=resolved_settings.kafka_bootstrap_servers,
         KAFKA_WEB_RESULT_GROUP=resolved_settings.kafka_web_result_group,
         PGN_SPOOL_DIRECTORY=resolved_settings.pgn_spool_directory,
-        MAX_CONTENT_LENGTH=resolved_settings.max_pgn_upload_bytes,
+        # Whole-request cap, checked before the body is read. SpoolService
+        # enforces the exact per-file limit; the overhead keeps an at-limit
+        # file's multipart envelope from tripping this first.
+        MAX_CONTENT_LENGTH=resolved_settings.max_pgn_upload_bytes
+        + MULTIPART_OVERHEAD_BYTES,
+        MAX_PGN_UPLOAD_BYTES=resolved_settings.max_pgn_upload_bytes,
         MAX_PASTED_PGN_BYTES=resolved_settings.max_pasted_pgn_bytes,
         SECRET_KEY=resolved_settings.secret_key,
         # Secure keeps the session cookie off plain HTTP; it must stay off for

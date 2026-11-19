@@ -9,7 +9,7 @@ from pathlib import Path
 DEFAULT_KAFKA_BOOTSTRAP_SERVERS = "localhost:19092"
 DEFAULT_KAFKA_WEB_RESULT_GROUP = "chess-web-results-v1"
 DEFAULT_PGN_SPOOL_DIRECTORY = Path(".runtime/pgn-spool")
-DEFAULT_MAX_PGN_UPLOAD_BYTES = 4 * 1024**3
+DEFAULT_MAX_PGN_UPLOAD_BYTES = 20 * 1024**2
 DEFAULT_MAX_PASTED_PGN_BYTES = 10 * 1024**2
 DEFAULT_SECRET_KEY = "development-only-change-me"
 
