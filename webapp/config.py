@@ -25,6 +25,19 @@ def _read_text(
     raise ValueError(f"{variable} is required")
 
 
+def _read_boolean(
+    environ: Mapping[str, str], variable: str, default: bool
+) -> bool:
+    raw_value = environ.get(variable, "").strip().lower()
+    if not raw_value:
+        return default
+    if raw_value in {"1", "true", "yes", "on"}:
+        return True
+    if raw_value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{variable} must be true or false")
+
+
 def _read_positive_integer(
     environ: Mapping[str, str], variable: str, default: int
 ) -> int:
@@ -54,6 +67,7 @@ class Settings:
     max_pasted_pgn_bytes: int = DEFAULT_MAX_PASTED_PGN_BYTES
     secret_key: str = DEFAULT_SECRET_KEY
     lichess_api_token: str = ""
+    session_cookie_secure: bool = False
 
     @classmethod
     def from_env(
@@ -87,4 +101,7 @@ class Settings:
             ),
             secret_key=_read_text(source, "SECRET_KEY", DEFAULT_SECRET_KEY),
             lichess_api_token=_read_text(source, "LICHESS_API_TOKEN", ""),
+            session_cookie_secure=_read_boolean(
+                source, "SESSION_COOKIE_SECURE", False
+            ),
         )

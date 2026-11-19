@@ -1,0 +1,16 @@
+# Public entry point for compose.prod.yaml. Caddy obtains and renews a
+# Let's Encrypt certificate for $DOMAIN (its DNS A record must point at this
+# server and ports 80/443 must be open) and redirects HTTP to HTTPS.
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy web:5000 {
+		# Send bytes immediately: SSE results must not sit in a proxy buffer.
+		flush_interval -1
+	}
+}

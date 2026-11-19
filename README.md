@@ -169,6 +169,29 @@ This launches PostgreSQL, Redpanda, the Redpanda console, a one-shot Alembic mig
 
 The model artifacts are copied into the image at build time, so rebuild after retraining. The root `compose.yaml` includes `infra/docker-compose.yaml` and shares its project name, so it reuses the same PostgreSQL and Redpanda data as the manual setup below.
 
+## Production deployment (single VM)
+
+The whole stack fits on one Linux VM with Docker (4 vCPU / 8 GB minimum: Stockfish is CPU-bound and the three model workers each load torch). `compose.prod.yaml` layers production settings on top of `compose.yaml`:
+
+- **Caddy** (`infra/Caddyfile`) is the only service with public ports (80/443). It obtains a Let's Encrypt certificate for `DOMAIN`, redirects HTTP to HTTPS, and proxies to Flask without buffering so SSE updates arrive immediately.
+- **gunicorn** (`gthread`, 2 workers x 16 threads) replaces the Flask dev server. Each open live-results stream holds one thread, so threads bound concurrent viewers.
+- PostgreSQL, Redpanda, and Flask publish **no host ports**. The Redpanda console starts only with `--profile debug`, bound to `127.0.0.1:8080`; reach it with `ssh -L 8080:localhost:8080 <server>`.
+- `SECRET_KEY` and `POSTGRES_PASSWORD` have **no fallbacks**: compose refuses to start without them. Session cookies are marked `Secure`.
+
+On the server, point the domain's DNS A record at it, open ports 80 and 443, copy trained artifacts into `ml-model/models/`, then create `.env` (git-ignored) next to `compose.yaml`:
+
+```bash
+DOMAIN=chess.example.com
+SECRET_KEY=<output of: python3 -c "import secrets; print(secrets.token_urlsafe(64))">
+POSTGRES_PASSWORD=<a second, different random value>
+```
+
+```bash
+docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+```
+
+`POSTGRES_PASSWORD` is applied only when Postgres initialises an empty volume, so set it before the first start (or change it later with `ALTER USER chess PASSWORD ...`). Inspect the database with `docker compose exec postgres psql -U chess chess_analytics`. Back up with a scheduled `docker compose exec -T postgres pg_dump -U chess chess_analytics | gzip > backup.sql.gz`; a single VM without backups is this setup's main risk.
+
 ## Local setup
 
 Install the Python environment and start the local infrastructure:
@@ -284,6 +307,7 @@ After cleanup, restart the stopped services and upload the PGN again to begin a 
 | `MAX_PGN_UPLOAD_BYTES` | File upload limit | 4 GiB |
 | `MAX_PASTED_PGN_BYTES` | Pasted-text limit | 10 MiB |
 | `SECRET_KEY` | Flask secret | development value only |
+| `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only (`true`/`false`); `compose.prod.yaml` sets `true` | `false` |
 | `CHESS_ENGINE` | Fallback engine for focused standalone/debug reporter runs; web jobs carry their own persisted choice | `xgboost` |
 | `STOCKFISH_PATH` | Stockfish binary for the Go feature extractor | `stockfish` on `PATH` |
 

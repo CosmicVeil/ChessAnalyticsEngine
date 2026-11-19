@@ -26,6 +26,10 @@ def create_app(
         MAX_CONTENT_LENGTH=resolved_settings.max_pgn_upload_bytes,
         MAX_PASTED_PGN_BYTES=resolved_settings.max_pasted_pgn_bytes,
         SECRET_KEY=resolved_settings.secret_key,
+        # Secure keeps the session cookie off plain HTTP; it must stay off for
+        # local http://localhost development, so production opts in.
+        SESSION_COOKIE_SECURE=resolved_settings.session_cookie_secure,
+        SESSION_COOKIE_SAMESITE="Lax",
     )
     from webapp.database import create_session_factory
     from webapp.lichess import LichessStudyClient
