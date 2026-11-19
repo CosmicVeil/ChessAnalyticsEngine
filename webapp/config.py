@@ -53,6 +53,7 @@ class Settings:
     max_pgn_upload_bytes: int = DEFAULT_MAX_PGN_UPLOAD_BYTES
     max_pasted_pgn_bytes: int = DEFAULT_MAX_PASTED_PGN_BYTES
     secret_key: str = DEFAULT_SECRET_KEY
+    lichess_api_token: str = ""
 
     @classmethod
     def from_env(
@@ -85,4 +86,5 @@ class Settings:
                 source, "MAX_PASTED_PGN_BYTES", DEFAULT_MAX_PASTED_PGN_BYTES
             ),
             secret_key=_read_text(source, "SECRET_KEY", DEFAULT_SECRET_KEY),
+            lichess_api_token=_read_text(source, "LICHESS_API_TOKEN", ""),
         )

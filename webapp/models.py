@@ -38,6 +38,7 @@ GAME_STATUSES = (
     GAME_STATUS_COMPLETED,
     GAME_STATUS_FAILED,
 )
+ANALYSIS_ENGINES = ("nnue", "xgboost", "consensus")
 
 
 def _quoted_values(values: tuple[str, ...]) -> str:
@@ -46,6 +47,34 @@ def _quoted_values(values: tuple[str, ...]) -> str:
 
 class Base(DeclarativeBase):
     """Declarative metadata root for the web adapter schema."""
+
+
+class User(Base):
+    """A local account used to protect private PGN analyses."""
+
+    __tablename__ = "users"
+    __table_args__ = (
+        sa.UniqueConstraint("email", name="uq_users_email"),
+        sa.CheckConstraint(
+            f"preferred_engine IN ({_quoted_values(ANALYSIS_ENGINES)})",
+            name="ck_users_preferred_engine",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    email: Mapped[str] = mapped_column(sa.String(320), nullable=False)
+    display_name: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    password_hash: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    preferred_engine: Mapped[str] = mapped_column(
+        sa.String(16), nullable=False, default="nnue", server_default=sa.text("'nnue'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+
+    jobs: Mapped[list[AnalysisJob]] = relationship(back_populates="owner")
 
 
 class AnalysisJob(Base):
@@ -82,10 +111,23 @@ class AnalysisJob(Base):
             name="ck_analysis_jobs_attempt_count_non_negative",
         ),
         sa.Index("ix_analysis_jobs_status", "status"),
+        sa.Index("ix_analysis_jobs_owner_created", "owner_id", "created_at"),
+        sa.CheckConstraint(
+            f"engine IN ({_quoted_values(ANALYSIS_ENGINES)})",
+            name="ck_analysis_jobs_engine",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        sa.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    engine: Mapped[str] = mapped_column(
+        sa.String(16), nullable=False, default="nnue", server_default=sa.text("'nnue'")
     )
     source_type: Mapped[str] = mapped_column(sa.String(16), nullable=False)
     source_name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
@@ -143,6 +185,7 @@ class AnalysisJob(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    owner: Mapped[User | None] = relationship(back_populates="jobs")
 
 
 class AnalysisGame(Base):
@@ -334,6 +377,7 @@ class UnmatchedResult(Base):
 
 
 __all__ = [
+    "ANALYSIS_ENGINES",
     "GAME_STATUSES",
     "GAME_STATUS_ANALYZING",
     "GAME_STATUS_COMPLETED",
@@ -353,4 +397,5 @@ __all__ = [
     "Base",
     "JobEvent",
     "UnmatchedResult",
+    "User",
 ]

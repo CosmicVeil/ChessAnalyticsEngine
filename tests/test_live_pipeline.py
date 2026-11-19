@@ -109,7 +109,7 @@ class RecordingFactory:
 
 
 class LivePipelineTests(unittest.TestCase):
-    def test_worker_commands_keep_models_in_four_separate_processes(self) -> None:
+    def test_worker_commands_keep_models_in_separate_processes(self) -> None:
         self.assertEqual(
             worker_commands("/venv/python", Path("/repo/python-pipeline")),
             (
@@ -120,6 +120,10 @@ class LivePipelineTests(unittest.TestCase):
                 (
                     "/venv/python",
                     "/repo/python-pipeline/xgboost_inference.py",
+                ),
+                (
+                    "/venv/python",
+                    "/repo/python-pipeline/nnue_inference.py",
                 ),
                 (
                     "/venv/python",
@@ -138,6 +142,7 @@ class LivePipelineTests(unittest.TestCase):
             FakeProcess(7),
             FakeProcess(ignore_terminate=True),
             FakeProcess(),
+            FakeProcess(),
         ]
         factory = RecordingFactory(children)
         stderr = io.StringIO()
@@ -153,17 +158,17 @@ class LivePipelineTests(unittest.TestCase):
             "xgboost_inference.py exited with status 7",
             stderr.getvalue(),
         )
-        self.assertEqual(len(factory.commands), 4)
+        self.assertEqual(len(factory.commands), 5)
         self.assertFalse(children[1].terminated)
         self.assertEqual(children[1].wait_calls, [])
-        for child in (children[0], children[2], children[3]):
+        for child in (children[0], children[2], children[3], children[4]):
             self.assertTrue(child.terminated)
             self.assertTrue(child.wait_calls)
         self.assertTrue(children[2].killed)
         self.assertEqual(children[2].wait_calls, [5, None])
 
     def test_clean_worker_exit_is_still_an_unexpected_failure(self) -> None:
-        children = [FakeProcess(0), FakeProcess(), FakeProcess(), FakeProcess()]
+        children = [FakeProcess(0), FakeProcess(), FakeProcess(), FakeProcess(), FakeProcess()]
 
         with redirect_stderr(io.StringIO()):
             status = run_pipeline(
@@ -174,7 +179,7 @@ class LivePipelineTests(unittest.TestCase):
         self.assertEqual(status, 1)
 
     def test_keyboard_interrupt_returns_zero_and_stops_every_worker(self) -> None:
-        children = [FakeProcess() for _ in range(4)]
+        children = [FakeProcess() for _ in range(5)]
         observed_delays: list[float] = []
 
         def interrupting_sleep(delay: float) -> None:

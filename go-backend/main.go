@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -18,10 +15,6 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-const chessAPIURL = "https://chess-api.com/v1"
-
-var chessAPIClient = &http.Client{Timeout: 5 * time.Second}
-
 type ChessMoveEvent struct {
 	GameID       string  `json:"game_id"`
 	Move         string  `json:"move"`
@@ -30,6 +23,7 @@ type ChessMoveEvent struct {
 	BlackRating  string  `json:"Black Rating"`
 	Time         float64 `json:"time"`
 	GameComplete bool    `json:"game_complete,omitempty"`
+	Engine       string  `json:"engine,omitempty"`
 }
 
 type FeatureVector struct {
@@ -47,6 +41,7 @@ type FeatureVector struct {
 	Evaluation      int     `json:"evaluation"`
 	WinChance       float64 `json:"win_chance"`
 	Mate            int     `json:"mate"`
+	Engine          string  `json:"engine,omitempty"`
 }
 
 type GameInfo struct {
@@ -69,19 +64,6 @@ type Analysis struct {
 	Evaluation    int
 	WinChance     float64
 	Mate          *int
-}
-
-type apiResponse struct {
-	Centipawns int
-	WinChance  float64
-	Mate       *int
-}
-
-type apiWireResponse struct {
-	Centipawns string  `json:"centipawns"`
-	WinChance  float64 `json:"winChance"`
-	Mate       *int    `json:"mate"`
-	Error      string  `json:"error"`
 }
 
 func NewSafeMap() *SafeMap {
@@ -177,6 +159,18 @@ func main() {
 
 	ctx := context.Background()
 
+	// Engine features come from a local Stockfish. Without one, they stay zero,
+	// which models trained on engine features will misread, so say so loudly.
+	var evaluator positionEvaluator
+	if path, err := stockfishPath(); err != nil {
+		log.Printf("WARNING: Stockfish not found (%v); engine features will be zero", err)
+	} else if engine, err := newStockfishEvaluator(path); err != nil {
+		log.Printf("WARNING: could not start Stockfish at %s (%v); engine features will be zero", path, err)
+	} else {
+		evaluator = engine
+		defer engine.Close()
+	}
+
 	for {
 
 		msg, err := reader.FetchMessage(ctx)
@@ -239,19 +233,16 @@ func main() {
 			continue
 		}
 
-		// Temporarily disabled: the Chess API rate limit cannot support one request
-		// for the position before and after every move. Re-enable this block when a
-		// higher request allowance or a local engine is available.
+		// Stockfish scores the positions before and after this move.
 		var currAnalysis Analysis
-		// currAnalysis, analysisErr := AnalyzeLastMove(ctx, game)
-		// if analysisErr != nil {
-		// 	log.Printf(
-		// 		"game %s move %d: Chess API analysis unavailable: %v",
-		// 		event.GameID,
-		// 		event.MoveNumber,
-		// 		analysisErr,
-		// 	)
-		// }
+		if evaluator != nil {
+			analysis, analysisErr := analyzeLastMove(evaluator, game)
+			if analysisErr != nil {
+				log.Printf("game %s move %d: engine analysis unavailable: %v", event.GameID, event.MoveNumber, analysisErr)
+			} else {
+				currAnalysis = analysis
+			}
+		}
 
 		var materialImbalance int = findMaterialImbalance(game)
 
@@ -271,6 +262,7 @@ func main() {
 		}
 
 		var currFeatureVector FeatureVector = FeatureVector{GameID: event.GameID,
+			Engine:          event.Engine,
 			MoveNumber:      event.MoveNumber,
 			MaterialBalance: materialImbalance, ComplexityScore: len(game.ValidMoves()),
 			TimeDelta:      time - event.Time,
@@ -301,6 +293,7 @@ func main() {
 			completedGame, err := json.Marshal(FeatureVector{
 				GameID:       event.GameID,
 				GameComplete: true,
+				Engine:       event.Engine,
 			})
 			if err != nil {
 				log.Printf("could not marshal completed game %s: %v", event.GameID, err)
@@ -450,84 +443,4 @@ func findNumMajorPieces(game *chess.Game, moveNumber int) int {
 	}
 
 	return numPieces
-}
-
-func AnalyzeLastMove(ctx context.Context, game *chess.Game) (Analysis, error) {
-	return analyzeLastMove(ctx, game, chessAPIURL, chessAPIClient)
-}
-
-func analyzeLastMove(ctx context.Context, game *chess.Game, endpoint string, client *http.Client) (Analysis, error) {
-	if game == nil {
-		return Analysis{}, errors.New("chess game is nil")
-	}
-	history := game.MoveHistory()
-	if len(history) == 0 {
-		return Analysis{}, errors.New("chess game has no moves")
-	}
-
-	last := history[len(history)-1]
-	before, err := evaluateFEN(ctx, endpoint, client, last.PrePosition.String())
-	if err != nil {
-		return Analysis{}, err
-	}
-	after, err := evaluateFEN(ctx, endpoint, client, last.PostPosition.String())
-	if err != nil {
-		return Analysis{}, err
-	}
-
-	loss := before.Centipawns - after.Centipawns
-	if last.PrePosition.Turn() == chess.Black {
-		loss = -loss
-	}
-	if loss < 0 {
-		loss = 0
-	}
-	return Analysis{
-		CentipawnLoss: loss,
-		Evaluation:    after.Centipawns,
-		WinChance:     after.WinChance,
-		Mate:          after.Mate,
-	}, nil
-}
-
-func evaluateFEN(ctx context.Context, endpoint string, client *http.Client, fen string) (apiResponse, error) {
-	body, err := json.Marshal(struct {
-		FEN string `json:"fen"`
-	}{FEN: fen})
-	if err != nil {
-		return apiResponse{}, err
-	}
-
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return apiResponse{}, err
-	}
-	request.Header.Set("Content-Type", "application/json")
-
-	response, err := client.Do(request)
-	if err != nil {
-		return apiResponse{}, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return apiResponse{}, fmt.Errorf("chess API returned %s", response.Status)
-	}
-
-	var wire apiWireResponse
-	if err := json.NewDecoder(response.Body).Decode(&wire); err != nil {
-		return apiResponse{}, err
-	}
-	if wire.Error != "" {
-		return apiResponse{}, errors.New(wire.Error)
-	}
-	centipawns, err := strconv.Atoi(wire.Centipawns)
-	if err != nil {
-		return apiResponse{}, fmt.Errorf("invalid centipawns: %w", err)
-	}
-
-	return apiResponse{
-		Centipawns: centipawns,
-		WinChance:  wire.WinChance,
-		Mate:       wire.Mate,
-	}, nil
 }

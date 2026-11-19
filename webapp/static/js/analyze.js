@@ -127,6 +127,8 @@ if (form) {
     event.preventDefault();
     status.textContent = "";
     const data = new FormData();
+    data.append("engine", form.elements.engine.value);
+    data.append("csrf_token", form.elements.csrf_token.value);
     if (sourceTabs.mode === "file" && fileInput.files[0]) data.append("pgn_file", fileInput.files[0]);
     if (sourceTabs.mode === "paste") data.append("pgn_text", textarea.value);
     if (sourceTabs.mode === "lichess") data.append("lichess_url", form.elements.lichess_url.value);

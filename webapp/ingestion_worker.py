@@ -59,7 +59,7 @@ class IngestionWorker:
                     game = self.store.upsert_parsed_game(claim.id, parsed)
                     self.publisher.publish_game(
                         game.pipeline_game_id,
-                        build_move_events(parsed, game.pipeline_game_id),
+                        build_move_events(parsed, game.pipeline_game_id, claim.engine),
                     )
                     self.store.mark_game_published(game.id)
 

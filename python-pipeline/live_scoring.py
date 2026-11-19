@@ -12,7 +12,7 @@ MODEL_DIRECTORY = Path(__file__).resolve().parents[1] / "ml-model"
 if str(MODEL_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(MODEL_DIRECTORY))
 
-from training_data import aggregate_game_features
+from training_data import aggregate_game_features, move_feature_frame
 
 
 PredictFunction = Callable[[pd.DataFrame], float]
@@ -44,15 +44,24 @@ class GameFeatureCollector:
             return None
 
         # This is the move-to-game step: many move records become one game vector.
-        game_features = aggregate_game_features(pd.DataFrame(records)).reindex(
+        move_frame = pd.DataFrame(records)
+        game_features = aggregate_game_features(move_frame).reindex(
             columns=self.feature_schema, fill_value=0.0
         )
+        # The NNUE engine reads moves one by one, so it also gets the ordered
+        # per-move matrix. The XGBoost and PyTorch workers ignore this field.
+        moves = move_feature_frame(move_frame)
+        if "move_number" in moves.columns:
+            moves = moves.sort_values("move_number", kind="stable")
         return {
             "game_id": game_id,
+            "engine": records[0].get("engine", "xgboost"),
             "features": {
                 column: float(value)
                 for column, value in game_features.iloc[0].items()
             },
+            "move_columns": moves.columns.tolist(),
+            "moves": moves.to_numpy(dtype="float64").tolist(),
         }
 
     def discard_game(self, game_id: str) -> None:

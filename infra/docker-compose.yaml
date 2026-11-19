@@ -49,6 +49,11 @@ services:
       - --default-log-level=info
     image: docker.redpanda.com/redpandadata/redpanda:v26.1.12
     container_name: redpanda-0
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     volumes:
       - redpanda-0:/var/lib/redpanda/data
     networks:

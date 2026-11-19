@@ -28,6 +28,7 @@ def create_app(
         SECRET_KEY=resolved_settings.secret_key,
     )
     from webapp.database import create_session_factory
+    from webapp.lichess import LichessStudyClient
     from webapp.repository import SqlAlchemyAnalysisStore
     from webapp.services import AdapterHealthProbe
     from webapp.spool import SpoolService
@@ -46,14 +47,26 @@ def create_app(
         ),
         health_probe=supplied_dependencies.health_probe
         or AdapterHealthProbe(sessions, resolved_settings.kafka_bootstrap_servers),
+        account_store=supplied_dependencies.account_store,
+        lichess_client=supplied_dependencies.lichess_client
+        or LichessStudyClient(resolved_settings.lichess_api_token),
     )
     app.extensions["web_settings"] = resolved_settings
     app.extensions["web_dependencies"] = resolved_dependencies
+
+    from webapp.auth import MemoryAccountStore, auth, csrf_token
+
+    app.extensions["account_store"] = (
+        supplied_dependencies.account_store
+        or (resolved_dependencies.store if hasattr(resolved_dependencies.store, "create_account") else MemoryAccountStore())
+    )
+    app.jinja_env.globals["csrf_token"] = csrf_token
 
     from webapp.api import api
     from webapp.pages import pages
 
     app.register_blueprint(api)
+    app.register_blueprint(auth)
     app.register_blueprint(pages)
     return app
 

@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
-import uuid, requests, os
+import uuid
 
-from flask import Blueprint, Response, current_app, jsonify, request, url_for
+from flask import Blueprint, Response, current_app, g, jsonify, request, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from webapp.domain import GameQuery, WebDependencies
+from webapp.lichess import (
+    InvalidStudyUrl,
+    LichessUnavailable,
+    StudyForbidden,
+    StudyNotFound,
+    StudyRef,
+    parse_study_url,
+)
 from webapp.pgn import iter_pgn_games
 from webapp.services import health_view
 from webapp.spool import SourceTooLarge
 from webapp.sse import stream_events
+from webapp.auth import login_required, owns_job, valid_csrf
+from webapp.models import ANALYSIS_ENGINES
 
 
 api = Blueprint("api", __name__, url_prefix="/api")
-LICHESS_API_KEY = os.environ.get("LICHESS_API_KEY")
-
 def _dependencies() -> WebDependencies:
     return current_app.extensions["web_dependencies"]
 
@@ -33,7 +41,10 @@ def request_too_large(_error_value):
 
 
 @api.post("/analyses")
+@login_required
 def create_analysis():
+    if not valid_csrf():
+        return _error("invalid_csrf", "Your session expired. Refresh and try again.", 403)
     uploaded = request.files.get("pgn_file")
     has_file = uploaded is not None and bool(uploaded.filename)
     pasted = request.form.get("pgn_text")
@@ -46,25 +57,16 @@ def create_analysis():
             "Submit exactly one PGN file, pasted PGN, or Lichess Study URL.",
             400,
         )
+    engine = request.form.get("engine", "").strip().lower()
+    if engine not in ANALYSIS_ENGINES:
+        return _error("invalid_engine", "Choose NNUE, XGBoost, or NNUE + XGBoost.", 400)
+
+    study = None
     if has_lichess:
-        # return _error(
-        #     "connector_unavailable",
-        #     "Lichess Study import is reserved for a future connector.",
-        #     501,
-        #     url=lichess_url.strip(),
-        # )
-
         try:
-
-            liches_api_url = lichess_url[0:lichess_url.find('g')+2]+"api/"+lichess_url[lichess_url.find('g')+2:]+".pgn"
-
-            response = requests.get(liches_api_url, headers={
-                "Authorization": LICHESS_API_KEY
-            })
-            pasted = response.text
-        except:
-            return _error()
-
+            study = parse_study_url(lichess_url)
+        except InvalidStudyUrl as error:
+            return _error("invalid_lichess_url", str(error), 400)
 
     dependencies = _dependencies()
     spool = dependencies.spool_service
@@ -72,10 +74,18 @@ def create_analysis():
     try:
         if has_file:
             source = spool.spool_file(uploaded.stream, uploaded.filename)
+        elif study is not None:
+            source = _spool_lichess_study(dependencies, study)
         else:
             source = spool.spool_text(pasted)
     except SourceTooLarge as error:
         return _error("source_too_large", str(error), 413, limit=error.limit)
+    except StudyNotFound as error:
+        return _error("lichess_study_not_found", str(error), 404)
+    except StudyForbidden as error:
+        return _error("lichess_study_private", str(error), 403)
+    except LichessUnavailable as error:
+        return _error("lichess_unavailable", str(error), 502)
 
     try:
         with source.spool_path.open(encoding="utf-8") as stream:
@@ -88,7 +98,7 @@ def create_analysis():
         return _error("empty_pgn", "The submitted source contains no games.", 422)
 
     try:
-        job = dependencies.store.create_queued_job(source)
+        job = dependencies.store.create_queued_job(source, g.current_user.id, engine)
     except Exception:
         source.spool_path.unlink(missing_ok=True)
         return _error("database_unavailable", "PostgreSQL is unavailable.", 503)
@@ -107,11 +117,23 @@ def create_analysis():
     ), 202
 
 
+def _spool_lichess_study(dependencies: WebDependencies, study: StudyRef):
+    """Stream the Study's PGN export straight into the private spool."""
+    response = dependencies.lichess_client.open_pgn(study)
+    try:
+        return dependencies.spool_service.spool_remote(response, study.source_name, "lichess")
+    except OSError as error:
+        raise LichessUnavailable("The Lichess download was interrupted.") from error
+    finally:
+        response.close()
+
+
 @api.get("/analyses/<uuid:job_id>")
+@login_required
 def get_analysis(job_id: uuid.UUID):
     try:
-        event_cursor = _dependencies().store.latest_event_id(job_id)
-        job = _dependencies().store.get_job(job_id)
+        job = owns_job(job_id)
+        event_cursor = _dependencies().store.latest_event_id(job_id) if job else 0
     except Exception:
         return _error("database_unavailable", "PostgreSQL is unavailable.", 503)
     if job is None:
@@ -120,10 +142,11 @@ def get_analysis(job_id: uuid.UUID):
 
 
 @api.get("/analyses/<uuid:job_id>/games")
+@login_required
 def get_games(job_id: uuid.UUID):
     store = _dependencies().store
     try:
-        if store.get_job(job_id) is None:
+        if owns_job(job_id) is None:
             return _error("job_not_found", "Analysis job was not found.", 404)
         query = _game_query()
         page = store.list_games(job_id, query)
@@ -185,10 +208,11 @@ def _optional_integer(name: str, default: int | None = None) -> int | None:
 
 
 @api.get("/analyses/<uuid:job_id>/events")
+@login_required
 def get_events(job_id: uuid.UUID):
     store = _dependencies().store
     try:
-        if store.get_job(job_id) is None:
+        if owns_job(job_id) is None:
             return _error("job_not_found", "Analysis job was not found.", 404)
     except Exception:
         return _error("database_unavailable", "PostgreSQL is unavailable.", 503)

@@ -46,6 +46,17 @@ class SpoolService:
             limit=self.max_pgn_upload_bytes,
         )
 
+    def spool_remote(
+        self, stream: BinaryIO, source_name: str, source_type: str
+    ) -> SpooledSource:
+        """Spool a fetched stream (e.g. a Lichess export) under the upload limit."""
+        return self._spool(
+            stream,
+            source_type=source_type,
+            source_name=source_name,
+            limit=self.max_pgn_upload_bytes,
+        )
+
     def spool_text(
         self, text: str, source_name: str = "pasted-pgn"
     ) -> SpooledSource:

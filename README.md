@@ -90,6 +90,58 @@ There are no dataset-wide values to persist for L2 normalization. The live worke
 
 The network trains with `BCEWithLogitsLoss`, so its final value is a logit. Live inference applies `sigmoid` once to produce the displayed zero-to-one score. XGBoost uses the positive-class value from `predict_proba`.
 
+### Stockfish engine features
+
+Each move carries four engine features: `centipawn_loss` (how much the move worsened the mover's evaluation), `evaluation` (the position after the move, in centipawns from White's side), `win_chance` (White's expected score on Lichess's curve), and `mate` (moves to a forced mate from White's side, 0 when none). They come from a local Stockfish searching 5,000 nodes per position. Scores are clamped to +/-1000, a forced mate counts as the clamp value, and checkmate or stalemate positions are scored directly because they have no search score. `ml-model/engine_features.py` and `go-backend/engine.go` implement the same rules, so training and live features match.
+
+- **Training data:** `ml-model/add_engine_features.py` analyses every game in `data/sample.pgn` and `data/AI_sample.pgn`, matched to the dataset by game ID and move count. It caches one line per game, so an interrupted run resumes, then fills the four columns. The untouched dataset is kept as `chess_dataset_without_engine.csv`. On 11 workers the full dataset takes about 50 minutes.
+- **Live:** the Go feature extractor runs Stockfish from `STOCKFISH_PATH`, or from `PATH`, for the positions before and after each move. Without Stockfish it logs a warning and sends zeros, which models trained on engine features will misread. The Docker image installs Debian's `stockfish` package. That package can be an older Stockfish version than the one used for training, which shifts the features slightly; for an exact match, use the same Stockfish version in both places.
+
+These features lift both models from about 88% to about 97% accuracy. Cheating games average 14.6 centipawns lost per move, against 40.2 for clean games.
+
+### NNUE engine (switchable alternative to XGBoost)
+
+`ml-model/nnue_model.py` is an NNUE-style classifier. It borrows the structure of a chess-engine NNUE (sparse inputs, a linear accumulator, a small clipped-ReLU head) and applies it to the move stream instead of board positions:
+
+- **Sparse per-move features.** Each move switches on a few one-hot features: a quantile bucket for each move statistic, a *game phase x bucket* cross (the analogue of HalfKP's king x piece cross), and a *previous bucket x current bucket* transition with the same player's last move (lag 2).
+- **Efficiently updatable accumulator.** The first layer is linear, so a game's accumulator is the running sum of its moves' active weight columns. `NNUEAccumulator.push_move` adds one move at a time, and the live worker scores games this way. Training uses the equivalent per-game feature histogram because it batches faster.
+- **Head.** accumulator + dense game features -> ClippedReLU -> 32 -> 32 -> 1, averaged over a 5-seed ensemble.
+
+Unlike XGBoost, which only sees each game's mean/std/min/max/last summaries, the NNUE reads every move. The collector therefore adds an ordered `moves` matrix (plus `move_columns`) to each `chess-game-features` message. The other workers ignore that field.
+
+`train_nnue.py` uses the same grouped train/test split as `train_xgboost.py`. Inside the training games, 5-fold cross-fitting picks the epoch count and logs the out-of-fold accuracy/FPR curve. The model is then refit on every training game. The 0.55 cutoff is folded into the output logit, so the shared `score >= 0.5` rule applies it.
+
+Measured against XGBoost (same features, same data, with Stockfish engine features), using the NNUE's fixed 0.55 cutoff:
+
+| Evaluation | XGBoost accuracy / FPR | NNUE accuracy / FPR |
+| --- | --- | --- |
+| Shared held-out test split (8,090 games) | 97.17% / 2.48% | 97.58% / 1.70% |
+
+Ten fresh random 70/30 grouped splits (seeds 201-210, never used for any modelling or cutoff decision; both engines retrained on each) give paired NNUE-minus-XGBoost differences:
+
+| Metric | Mean difference (standard error) | NNUE better on |
+| --- | --- | --- |
+| Accuracy | 0.47 points higher (0.06) | 10 of 10 splits |
+| False positive rate | 0.61 points lower (0.12) | 9 of 10 splits |
+
+Both gaps are many standard errors wide, so the NNUE is reliably better on both metrics. It reads every move's engine evaluation, so it sees patterns such as a run of near-perfect moves from one player, which XGBoost's per-game mean/std/min/max/last summaries blur together.
+
+Before the engine features existed, the same comparison on fresh splits (seeds 101-110) showed the NNUE with a lower FPR (0.80 points, SE 0.19) but statistically tied accuracy (0.13 points lower, SE 0.10). The engine features are what opened the accuracy gap.
+
+The cutoff is `fixed_threshold` in `train_nnue.py`; set it to `None` to pick one from out-of-fold scores, and use the out-of-fold accuracy/FPR curve the trainer prints to choose a different trade-off.
+
+### Consensus engine (XGBoost AND NNUE)
+
+`CHESS_ENGINE=consensus` runs both the XGBoost and NNUE workers and flags a game as AI only when **both** do. Its score is `min(xgboost, nnue)`, which crosses the shared 0.5 cutoff exactly when both scores do. The individual scores are kept in the result's `engine_scores` field. Requiring agreement trades some recall for fewer false accusations:
+
+| Engine (held-out split, 8,090 games) | Accuracy | Human games flagged AI (FPR) | AI games caught (TPR) |
+| --- | --- | --- | --- |
+| XGBoost | 97.17% | 127 / 5,120 (2.48%) | 2,868 / 2,970 (96.57%) |
+| NNUE | 97.58% | 87 / 5,120 (1.70%) | 2,861 / 2,970 (96.33%) |
+| Consensus | 97.31% | 70 / 5,120 (1.37%) | 2,822 / 2,970 (95.02%) |
+
+Authenticated web submissions persist an engine choice of `xgboost`, `nnue`, or `consensus` on each analysis job. The supervisor runs both optional engine workers; each worker scores only jobs that require it, and the reporter joins the required outputs per game. The joined result keeps the existing `xgboost_*` compatibility fields while its `engine` metadata records which engine produced them. `CHESS_ENGINE` remains available for focused standalone/debug reporter runs.
+
 ## Core architecture changes
 
 The topic topology and process isolation remain intact. Changes to the existing core are limited and additive:
@@ -104,6 +156,18 @@ The topic topology and process isolation remain intact. Changes to the existing 
 The web layer also adds PostgreSQL, Alembic migrations, private PGN spooling, durable job events, and idempotent result storage. These additions adapt the pipeline for browser workloads without moving feature extraction or inference into Flask. The frontend presentation work changes neither feature extraction nor model inference.
 
 The job-status response now carries top-level `event_cursor` resume metadata alongside `job`. This is an additive web-adapter/API contract: it reads the existing durable event IDs and changes no database schema, Kafka contract, feature pipeline, or inference process.
+
+## Quick start (Docker)
+
+With Docker running and trained artifacts in `ml-model/models/` (see the XGBoost retraining command below), start the whole stack from the repository root:
+
+```bash
+docker compose up --build
+```
+
+This launches PostgreSQL, Redpanda, the Redpanda console, a one-shot Alembic migration, the Go feature extractor, the core Python pipeline, Flask, and both web workers. Open `http://localhost:5000` (set `WEB_PORT` to change the port and `SECRET_KEY` for anything beyond local use). Stop it with `docker compose down`; add `-v` to also delete the database, Kafka data, and spooled PGNs.
+
+The model artifacts are copied into the image at build time, so rebuild after retraining. The root `compose.yaml` includes `infra/docker-compose.yaml` and shares its project name, so it reuses the same PostgreSQL and Redpanda data as the manual setup below.
 
 ## Local setup
 
@@ -139,7 +203,7 @@ For debugging, stop the supervisor and start the same workers individually:
 
 ```bash
 .venv/bin/python python-pipeline/live_game_collector.py
-.venv/bin/python python-pipeline/xgboost_inference.py
+.venv/bin/python python-pipeline/xgboost_inference.py   # or nnue_inference.py with CHESS_ENGINE=nnue
 .venv/bin/python python-pipeline/torch_inference.py
 .venv/bin/python python-pipeline/prediction_reporter.py
 ```
@@ -154,11 +218,33 @@ Keep Flask and both web adapter workers separate from the core launcher, with ea
 
 Open `http://127.0.0.1:5000`. The health endpoint is `GET /api/health`.
 
+To fill the dataset's Stockfish columns (requires `brew install stockfish`; resumable):
+
+```bash
+cd ml-model
+../.venv/bin/python add_engine_features.py
+```
+
 To retrain XGBoost and create its required preprocessing sidecar:
 
 ```bash
 cd ml-model
 ../.venv/bin/python train_xgboost.py
+```
+
+To train the NNUE engine (writes `ml-model/models/nnue_model.pt`), compare both engines on the shared test split, or compare them with 5-fold grouped cross-validation (slower, retrains both per fold):
+
+```bash
+cd ml-model
+../.venv/bin/python train_nnue.py
+../.venv/bin/python compare_engines.py
+../.venv/bin/python compare_engines.py --cv 5
+```
+
+Then run the pipeline with the NNUE engine in place of XGBoost:
+
+```bash
+.venv/bin/python python-pipeline/live_pipeline.py
 ```
 
 ## Clear unfinished analysis state
@@ -198,19 +284,25 @@ After cleanup, restart the stopped services and upload the PGN again to begin a 
 | `MAX_PGN_UPLOAD_BYTES` | File upload limit | 4 GiB |
 | `MAX_PASTED_PGN_BYTES` | Pasted-text limit | 10 MiB |
 | `SECRET_KEY` | Flask secret | development value only |
+| `CHESS_ENGINE` | Fallback engine for focused standalone/debug reporter runs; web jobs carry their own persisted choice | `xgboost` |
+| `STOCKFISH_PATH` | Stockfish binary for the Go feature extractor | `stockfish` on `PATH` |
 
 ## HTTP surface
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET /` | Home: combined PGN upload and live-results workspace |
-| `GET /analyze` | Compatibility redirect to Home (`/`) |
-| `GET /analyses/<job_id>` | Restorable Home state for a specific job |
-| `GET /system` | Information page |
-| `POST /api/analyses` | Create a file or paste analysis job |
-| `GET /api/analyses/<job_id>` | Job snapshot, counters, and additive SSE `event_cursor` resume metadata |
-| `GET /api/analyses/<job_id>/games` | Filtered, paginated game results |
-| `GET /api/analyses/<job_id>/events` | Durable SSE updates |
+| `GET /` | Public product overview and repository benchmark highlights |
+| `GET/POST /create-account` | Create a persisted local account and authenticated session |
+| `GET/POST /sign-in` | Sign in to an existing account |
+| `GET /evaluation` | Repository-backed model benchmark and interpretation guidance |
+| `GET /analyze` | Authenticated engine selection and PGN upload/paste workspace |
+| `GET /analyses/<job_id>` | Authenticated, owner-only restorable live job |
+| `GET/POST /profile` | Persisted preferences, usage totals, privacy information, and owned history |
+| `GET /system` | Information page (legacy route) |
+| `POST /api/analyses` | Authenticated creation of an owned file or paste analysis job |
+| `GET /api/analyses/<job_id>` | Owner-only job snapshot, counters, engine, and SSE resume cursor |
+| `GET /api/analyses/<job_id>/games` | Owner-only filtered, paginated game results |
+| `GET /api/analyses/<job_id>/events` | Owner-only durable SSE updates |
 | `GET /api/health` | Web, PostgreSQL, and Kafka health |
 
 ## Verification

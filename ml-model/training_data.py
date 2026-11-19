@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import GroupShuffleSplit
 
@@ -44,9 +45,7 @@ def aggregate_game_features(dataframe: pd.DataFrame) -> pd.DataFrame:
     """Convert each game's numeric move records into one model feature row."""
     game_ids = get_game_ids(dataframe)
     # The model does not see individual moves: it receives one summary row per game.
-    numeric_features = dataframe.select_dtypes(include="number").drop(
-        columns=[LABEL_COLUMN], errors="ignore"
-    )
+    numeric_features = move_feature_frame(dataframe)
     numeric_features.index = game_ids
     grouped_features = numeric_features.groupby(level=0, sort=False)
     aggregated_features = grouped_features.agg(GAME_AGGREGATIONS)
@@ -56,6 +55,36 @@ def aggregate_game_features(dataframe: pd.DataFrame) -> pd.DataFrame:
     ]
     aggregated_features["move_count"] = grouped_features.size().astype("float32")
     return aggregated_features.fillna(0.0).astype("float32")
+
+
+def move_feature_frame(dataframe: pd.DataFrame) -> pd.DataFrame:
+    """Select the numeric per-move columns that game aggregation also uses."""
+    return dataframe.select_dtypes(include="number").drop(
+        columns=[LABEL_COLUMN], errors="ignore"
+    )
+
+
+def prepare_game_move_sequences(
+    dataframe: pd.DataFrame, game_order: pd.Index
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Return every game's moves, concatenated in ``game_order`` and move order.
+
+    The result is ``(moves, lengths, columns)``: game ``i`` owns the next
+    ``lengths[i]`` rows of ``moves``. NNUE training consumes moves directly
+    instead of the per-game summary statistics.
+    """
+    numeric = move_feature_frame(dataframe)
+    codes = pd.Index(game_order).get_indexer(get_game_ids(dataframe))
+    if (codes < 0).any():
+        raise ValueError("Every move must belong to a game in game_order.")
+    move_numbers = (
+        numeric["move_number"].to_numpy()
+        if "move_number" in numeric.columns
+        else np.zeros(len(numeric))
+    )
+    order = np.lexsort((move_numbers, codes))
+    lengths = np.bincount(codes, minlength=len(game_order))
+    return numeric.to_numpy(dtype="float32")[order], lengths, numeric.columns.tolist()
 
 
 def prepare_game_training_data(dataframe: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:

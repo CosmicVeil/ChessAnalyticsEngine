@@ -21,18 +21,22 @@ BOOTSTRAP_SERVERS = get_kafka_bootstrap_servers()
 
 
 
+ENGINE_LABELS = {"xgboost": "XGBoost", "nnue": "NNUE", "consensus": "XGBoost AND NNUE"}
+
+
 def print_result(result: dict) -> None:
+    engine_label = ENGINE_LABELS.get(result.get("engine", "xgboost"), "Engine")
     print(
         f"Game: {result['game_id']} | "
         f"PyTorch: {result['pytorch_score']:.2%} | "
-        f"XGBoost: {result['xgboost_score']:.2%}"
+        f"{engine_label}: {result['xgboost_score']:.2%}"
     )
     if result["pytorch_accuracy"] is None:
         print("Running accuracy: unavailable until a verified game label is available.")
     else:
         print(
             f"Running accuracy - PyTorch: {result['pytorch_accuracy']:.2%} | "
-            f"XGBoost: {result['xgboost_accuracy']:.2%}"
+            f"{engine_label}: {result['xgboost_accuracy']:.2%}"
         )
 
 

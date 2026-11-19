@@ -19,6 +19,26 @@ from webapp.sse import format_sse, stream_events
 
 
 class SseTests(unittest.TestCase):
+    @staticmethod
+    def _authenticated_client(store):
+        app = create_app(
+            Settings(database_url="postgresql+psycopg://unused", secret_key="test"),
+            WebDependencies(store=store, spool_service=object(), health_probe=object()),
+        )
+        client = app.test_client()
+        client.get("/create-account")
+        with client.session_transaction() as session:
+            csrf = session["csrf_token"]
+        client.post("/create-account", data={
+            "csrf_token": csrf,
+            "display_name": "SSE Tester",
+            "email": f"sse-{uuid.uuid4()}@example.com",
+            "password": "correct horse battery staple",
+            "preferred_engine": "nnue",
+        })
+        with client.session_transaction() as session:
+            return client, uuid.UUID(session["user_id"])
+
     def test_format_is_compact_and_resumable(self):
         event = JobEventSnapshot(
             id=42,
@@ -69,22 +89,14 @@ class SseTests(unittest.TestCase):
 
     def _terminal_endpoint_client(self):
         store = FakeAnalysisStore()
+        client, owner_id = self._authenticated_client(store)
         job = store.create_queued_job(
-            SpooledSource("paste", "pgn", Path("/tmp/x"))
+            SpooledSource("paste", "pgn", Path("/tmp/x")), owner_id
         )
         store.claim_next_job(
             "w", datetime(2026, 8, 4, tzinfo=UTC), timedelta(minutes=1)
         )
         store.finish_ingestion(job.id, "w")
-        app = create_app(
-            Settings(database_url="postgresql+psycopg://unused"),
-            WebDependencies(
-                store=store,
-                spool_service=object(),
-                health_probe=object(),
-            ),
-        )
-        client = app.test_client()
         return store, job, client
 
     def test_endpoint_uses_greater_query_cursor_and_sets_stream_headers(self):
@@ -130,17 +142,13 @@ class SseTests(unittest.TestCase):
 
     def test_status_cursor_replays_only_events_committed_after_the_snapshot(self):
         store = FakeAnalysisStore()
+        client, owner_id = self._authenticated_client(store)
         job = store.create_queued_job(
-            SpooledSource("paste", "pgn", Path("/tmp/x"))
+            SpooledSource("paste", "pgn", Path("/tmp/x")), owner_id
         )
         store.claim_next_job(
             "w", datetime(2026, 8, 4, tzinfo=UTC), timedelta(minutes=1)
         )
-        app = create_app(
-            Settings(database_url="postgresql+psycopg://unused"),
-            WebDependencies(store=store, spool_service=object(), health_probe=object()),
-        )
-        client = app.test_client()
         status = client.get(f"/api/analyses/{job.id}").get_json()
         cursor = status["event_cursor"]
         historical_ids = [event.id for event in store.events]

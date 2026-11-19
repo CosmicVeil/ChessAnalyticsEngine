@@ -7,5 +7,7 @@ __pycache__/
 # Downloaded and generated chess datasets (kept locally, never committed)
 data/*.pgn
 ml-model/chess_dataset.csv
+ml-model/chess_dataset_without_engine.csv
+ml-model/engine_features_cache.jsonl
 ml-model/models/
 .runtime/

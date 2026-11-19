@@ -1,0 +1,81 @@
+# Full stack in one command from the repository root:
+#   docker compose up --build
+# Infrastructure (PostgreSQL, Redpanda, console) stays in infra/ so
+# docker_help/clear_analysis_state.sh keeps working unchanged.
+#
+# Same project name as infra/docker-compose.yaml so both files share
+# the existing postgres and redpanda volumes and containers.
+name: redpanda-quickstart-one-broker
+
+include:
+  - infra/docker-compose.yaml
+
+x-app: &app
+  build: .
+  image: chess-analytics-engine
+  restart: unless-stopped
+  networks:
+    - redpanda_network
+  environment: &app-env
+    DATABASE_URL: postgresql+psycopg://chess:chess@postgres:5432/chess_analytics
+    KAFKA_BOOTSTRAP_SERVERS: redpanda-0:9092
+    KAFKA_WEB_RESULT_GROUP: chess-web-results-v1
+    PGN_SPOOL_DIRECTORY: /spool
+    SECRET_KEY: ${SECRET_KEY:-development-only-change-me}
+    CHESS_ENGINE: ${CHESS_ENGINE:-xgboost}
+
+volumes:
+  pgn-spool: null
+
+services:
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    command: ["flask", "--app", "webapp", "run", "--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - ${WEB_PORT:-5000}:5000
+    # Flask writes uploads into the spool; the ingestion worker reads them.
+    volumes:
+      - pgn-spool:/spool
+    depends_on: &app-deps
+      migrate:
+        condition: service_completed_successfully
+      redpanda-0:
+        condition: service_healthy
+
+  ingestion-worker:
+    <<: *app
+    command: ["python", "-m", "webapp.ingestion_worker"]
+    volumes:
+      - pgn-spool:/spool
+    depends_on: *app-deps
+
+  result-worker:
+    <<: *app
+    command: ["python", "-m", "webapp.result_worker"]
+    depends_on: *app-deps
+
+  pipeline:
+    <<: *app
+    command: ["python", "python-pipeline/live_pipeline.py"]
+    depends_on:
+      redpanda-0:
+        condition: service_healthy
+
+  feature-extractor:
+    build: go-backend
+    restart: unless-stopped
+    networks:
+      - redpanda_network
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda-0:9092
+    depends_on:
+      redpanda-0:
+        condition: service_healthy

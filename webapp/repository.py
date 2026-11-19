@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from webapp.domain import (
+    AccountSnapshot,
     ClaimedJob,
     GameQuery,
     GameSnapshot,
@@ -41,6 +42,7 @@ from webapp.models import (
     AnalysisResult,
     JobEvent,
     UnmatchedResult,
+    User,
 )
 
 
@@ -57,9 +59,16 @@ class SqlAlchemyAnalysisStore:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
 
-    def create_queued_job(self, source: SpooledSource) -> JobSnapshot:
+    def create_queued_job(
+        self,
+        source: SpooledSource,
+        owner_id: uuid.UUID | None = None,
+        engine: str = "nnue",
+    ) -> JobSnapshot:
         with self._sessions.begin() as session:
             job = AnalysisJob(
+                owner_id=owner_id,
+                engine=engine,
                 source_type=source.source_type,
                 source_name=source.source_name,
                 spool_path=str(source.spool_path),
@@ -122,7 +131,48 @@ class SqlAlchemyAnalysisStore:
                 claimed_by=worker_id,
                 lease_expires_at=lease_expires_at,
                 attempt_count=job.attempt_count,
+                engine=job.engine,
             )
+
+    def create_account(
+        self,
+        *,
+        email: str,
+        display_name: str,
+        password_hash: str,
+        preferred_engine: str,
+    ) -> AccountSnapshot:
+        with self._sessions.begin() as session:
+            user = User(
+                email=email,
+                display_name=display_name,
+                password_hash=password_hash,
+                preferred_engine=preferred_engine,
+            )
+            session.add(user)
+            session.flush()
+            return _account_snapshot(user)
+
+    def get_account_by_email(self, email: str) -> AccountSnapshot | None:
+        with self._sessions() as session:
+            user = session.scalar(sa.select(User).where(User.email == email))
+            return None if user is None else _account_snapshot(user)
+
+    def get_account(self, user_id: uuid.UUID) -> AccountSnapshot | None:
+        with self._sessions() as session:
+            user = session.get(User, user_id)
+            return None if user is None else _account_snapshot(user)
+
+    def update_preferred_engine(
+        self, user_id: uuid.UUID, engine: str
+    ) -> AccountSnapshot:
+        with self._sessions.begin() as session:
+            user = session.get(User, user_id)
+            if user is None:
+                raise KeyError("account not found")
+            user.preferred_engine = engine
+            session.flush()
+            return _account_snapshot(user)
 
     def renew_claim(
         self,
@@ -373,6 +423,18 @@ class SqlAlchemyAnalysisStore:
             job = session.get(AnalysisJob, job_id)
             return None if job is None else _job_snapshot(job)
 
+    def list_jobs_for_user(
+        self, owner_id: uuid.UUID, limit: int = 50
+    ) -> tuple[JobSnapshot, ...]:
+        with self._sessions() as session:
+            jobs = session.scalars(
+                sa.select(AnalysisJob)
+                .where(AnalysisJob.owner_id == owner_id)
+                .order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
+                .limit(max(1, min(limit, 100)))
+            ).all()
+            return tuple(_job_snapshot(job) for job in jobs)
+
     def latest_event_id(self, job_id: uuid.UUID) -> int:
         statement = sa.select(sa.func.max(JobEvent.id)).where(
             JobEvent.job_id == job_id
@@ -492,6 +554,19 @@ def _job_snapshot(job: AnalysisJob) -> JobSnapshot:
         created_at=job.created_at,
         updated_at=job.updated_at,
         completed_at=job.completed_at,
+        owner_id=job.owner_id,
+        engine=job.engine,
+    )
+
+
+def _account_snapshot(user: User) -> AccountSnapshot:
+    return AccountSnapshot(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        password_hash=user.password_hash,
+        preferred_engine=user.preferred_engine,
+        created_at=user.created_at,
     )
 
 

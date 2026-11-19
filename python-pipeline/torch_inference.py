@@ -78,6 +78,7 @@ def main() -> None:
                         "game_id": completed_game["game_id"],
                         "model": "pytorch",
                         "score": score,
+                        "engine": completed_game.get("engine", "xgboost"),
                     }),
                 )
         except KeyboardInterrupt:

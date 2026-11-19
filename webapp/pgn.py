@@ -62,7 +62,7 @@ def iter_pgn_games(stream: TextIO) -> Iterator[ParsedGame | InvalidGame]:
 
 
 def build_move_events(
-    parsed: ParsedGame, game_id: str
+    parsed: ParsedGame, game_id: str, engine: str | None = None
 ) -> Iterator[dict[str, object]]:
     """Yield source-ordered SAN moves for one parsed game."""
 
@@ -79,7 +79,7 @@ def build_move_events(
         move_number += 1
         san = board.san(current.move)
         clock = current.clock()
-        yield {
+        event = {
             "game_id": game_id,
             "move": san,
             "move_number": move_number,
@@ -88,6 +88,9 @@ def build_move_events(
             "time": 0.0 if clock is None else float(clock),
             "game_complete": following is None,
         }
+        if engine is not None:
+            event["engine"] = engine
+        yield event
         board.push(current.move)
         current = following
 

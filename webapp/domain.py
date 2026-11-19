@@ -19,6 +19,16 @@ def _iso(value: datetime | None) -> str | None:
 
 
 @dataclass(frozen=True, slots=True)
+class AccountSnapshot:
+    id: uuid.UUID
+    email: str
+    display_name: str
+    password_hash: str
+    preferred_engine: str
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class SpooledSource:
     source_type: str
     source_name: str
@@ -59,6 +69,8 @@ class JobSnapshot:
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
+    owner_id: uuid.UUID | None = None
+    engine: str = "nnue"
 
     def to_view(self) -> dict[str, Any]:
         return {
@@ -66,6 +78,7 @@ class JobSnapshot:
             "source_type": self.source_type,
             "source_name": self.source_name,
             "status": self.status,
+            "engine": self.engine,
             "counts": {
                 "total": self.total_games,
                 "queued": self.queued_games,
@@ -146,6 +159,7 @@ class ClaimedJob:
     claimed_by: str
     lease_expires_at: datetime
     attempt_count: int
+    engine: str = "nnue"
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +207,12 @@ class Page(Generic[T]):
 
 @runtime_checkable
 class AnalysisStore(Protocol):
-    def create_queued_job(self, source: SpooledSource) -> JobSnapshot: ...
+    def create_queued_job(
+        self,
+        source: SpooledSource,
+        owner_id: uuid.UUID | None = None,
+        engine: str = "nnue",
+    ) -> JobSnapshot: ...
 
     def claim_next_job(
         self,
@@ -240,6 +259,10 @@ class AnalysisStore(Protocol):
 
     def get_job(self, job_id: uuid.UUID) -> JobSnapshot | None: ...
 
+    def list_jobs_for_user(
+        self, owner_id: uuid.UUID, limit: int = 50
+    ) -> tuple[JobSnapshot, ...]: ...
+
     def latest_event_id(self, job_id: uuid.UUID) -> int: ...
 
     def list_games(
@@ -258,9 +281,12 @@ class WebDependencies:
     store: object | None = None
     spool_service: object | None = None
     health_probe: object | None = None
+    account_store: object | None = None
+    lichess_client: object | None = None
 
 
 __all__ = [
+    "AccountSnapshot",
     "AnalysisStore",
     "ClaimedJob",
     "GameQuery",

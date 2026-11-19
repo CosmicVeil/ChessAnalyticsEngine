@@ -1,4 +1,4 @@
-"""Supervise the four isolated workers in the core live scoring pipeline."""
+"""Supervise the isolated workers in the core live scoring pipeline."""
 
 from __future__ import annotations
 
@@ -12,12 +12,21 @@ from typing import Protocol
 
 
 PIPELINE_DIRECTORY = Path(__file__).resolve().parent
-WORKER_SCRIPTS = (
-    "live_game_collector.py",
-    "xgboost_inference.py",
-    "torch_inference.py",
-    "prediction_reporter.py",
-)
+if str(PIPELINE_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIRECTORY))
+
+from engine_config import ENGINE_WORKER_SCRIPTS, get_selected_engine
+
+
+def worker_scripts(engine: str) -> tuple[str, ...]:
+    """The core workers; ``engine`` picks the engine scoring worker(s)."""
+
+    return (
+        "live_game_collector.py",
+        *ENGINE_WORKER_SCRIPTS[engine],
+        "torch_inference.py",
+        "prediction_reporter.py",
+    )
 
 
 class ChildProcess(Protocol):
@@ -38,12 +47,17 @@ ProcessFactory = Callable[[tuple[str, ...]], ChildProcess]
 def worker_commands(
     python: str = sys.executable,
     pipeline_directory: Path = PIPELINE_DIRECTORY,
+    engine: str | None = None,
 ) -> tuple[tuple[str, ...], ...]:
     """Build one interpreter command per worker without importing workers."""
 
+    # The web adapter makes a durable engine choice per job, so production
+    # runs both optional workers. Explicit engine arguments retain the
+    # focused commands used by local debugging and unit tests.
+    selected = "consensus" if engine is None else engine
     return tuple(
         (python, str(pipeline_directory / script))
-        for script in WORKER_SCRIPTS
+        for script in worker_scripts(selected)
     )
 
 

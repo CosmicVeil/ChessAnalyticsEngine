@@ -108,6 +108,7 @@ export function mountLiveAnalysis(root, jobId) {
 
   function updateJob(job) {
     latestJobStatus = job.status;
+    root.dataset.engine = job.engine || "xgboost";
     root.querySelector("[data-source-name]").textContent = job.source_name;
     for (const [key, value] of Object.entries(job.counts)) {
       const target = root.querySelector(`[data-count-key="${key}"]`);
@@ -123,7 +124,7 @@ export function mountLiveAnalysis(root, jobId) {
 
   function upsertGame(game) {
     const existing = cards.get(game.id);
-    const card = buildCard(game, existing);
+    const card = buildCard(game, existing, root.dataset.engine);
     if (!existing) {
       const following = [...ledger.children].find((node) => Number(node.dataset.sequence) > game.sequence);
       ledger.insertBefore(card, following || null);
@@ -291,7 +292,7 @@ async function apiErrorMessage(response, fallback) {
 const root = document.querySelector("[data-job-id]");
 if (root?.dataset.jobId) mountLiveAnalysis(root, root.dataset.jobId);
 
-export function buildCard(game, existing) {
+export function buildCard(game, existing, engine = "xgboost") {
   const detailWasOpen = existing?.querySelector("details.game-detail")?.open ?? false;
   const card = existing || element("article", "game-card is-new");
   card.dataset.sequence = game.sequence;
@@ -309,7 +310,8 @@ export function buildCard(game, existing) {
   identity.append(players);
   card.append(identity);
   card.append(verdictCell("pytorch", "PyTorch", game.scores?.pytorch));
-  card.append(verdictCell("xgb", "XGBoost", game.scores?.xgboost));
+  const engineName = engine === "nnue" ? "NNUE" : engine === "consensus" ? "NNUE + XGBoost" : "XGBoost";
+  card.append(verdictCell("xgb", engineName, game.scores?.xgboost));
 
   const state = element("div", "game-state");
   state.append(element("span", `state-label ${game.status}`, game.status));
@@ -325,7 +327,7 @@ export function buildCard(game, existing) {
   if (game.scores) {
     body.append(
       modelDetail("PyTorch", game.scores.pytorch),
-      modelDetail("XGBoost", game.scores.xgboost),
+      modelDetail(engineName, game.scores.xgboost),
       element("p", "game-detail-note", game.scores.agreement ? "Models agree." : "Models disagree."),
       element("p", "game-detail-note score-caveat", "These percentages are uncalibrated model scores, not measured accuracy, proof, or a calibrated probability that cheating occurred."),
     );

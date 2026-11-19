@@ -100,6 +100,24 @@ func TestShouldCompleteGameHonorsExplicitCompletion(t *testing.T) {
 	}
 }
 
+func TestEngineChoiceSurvivesMoveAndFeatureJSON(t *testing.T) {
+	var event ChessMoveEvent
+	if err := json.Unmarshal([]byte(`{"game_id":"web:job:1","engine":"consensus"}`), &event); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	feature, err := json.Marshal(FeatureVector{GameID: event.GameID, Engine: event.Engine})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if string(feature) == "" || !containsJSONField(feature, `"engine":"consensus"`) {
+		t.Fatalf("feature JSON = %s, want engine metadata", feature)
+	}
+}
+
+func containsJSONField(document []byte, field string) bool {
+	return strings.Contains(string(document), field)
+}
+
 func TestShouldCompleteGameRecognizesCheckmate(t *testing.T) {
 	game := chess.NewGame()
 	for _, move := range []string{"f3", "e5", "g4", "Qh4#"} {
@@ -140,26 +158,5 @@ func TestFindMaterialSwingsReturnsZeroForNonCapture(t *testing.T) {
 
 	if got := findMaterialSwings(game); got != 0 {
 		t.Fatalf("findMaterialSwings() = %d, want 0 for a non-capture", got)
-	}
-}
-
-func TestChessAPIClientHasBoundedTimeout(t *testing.T) {
-	if chessAPIClient.Timeout <= 0 {
-		t.Fatal("chess API client must have a timeout")
-	}
-}
-
-func TestEvaluateFENReturnsAPIError(t *testing.T) {
-	response, err := evaluateFEN(
-		context.Background(),
-		"http://127.0.0.1:1",
-		chessAPIClient,
-		"invalid-fen",
-	)
-	if err == nil {
-		t.Fatalf("evaluateFEN() response = %+v, want connection error", response)
-	}
-	if !strings.Contains(err.Error(), "connect") && !strings.Contains(err.Error(), "connection") {
-		t.Fatalf("evaluateFEN() error = %v, want connection error", err)
 	}
 }

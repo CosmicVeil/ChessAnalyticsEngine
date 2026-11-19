@@ -1,0 +1,16 @@
+# Keep the build context small and free of local state.
+.git/
+.idea/
+.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.runtime/
+.superpowers/
+.env
+**/.DS_Store
+docs/
+tests/
+data/
+ml-model/chess_dataset.csv

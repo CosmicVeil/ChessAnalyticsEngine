@@ -66,6 +66,10 @@ def main() -> None:
                     raise KafkaException(message.error())
 
                 completed_game = json.loads(message.value().decode("utf-8"))
+                if completed_game.get("engine", "xgboost") not in {"xgboost", "consensus"}:
+                    from kafka_delivery import commit_after_processing
+                    commit_after_processing(consumer, message)
+                    continue
                 # This row already summarizes all moves; XGBoost predicts once for the whole game.
                 score = score_completed_game(
                     model,
@@ -83,6 +87,7 @@ def main() -> None:
                         "game_id": completed_game["game_id"],
                         "model": "xgboost",
                         "score": score,
+                        "engine": completed_game.get("engine", "xgboost"),
                     }),
                 )
         except KeyboardInterrupt:

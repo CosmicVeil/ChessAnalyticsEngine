@@ -53,6 +53,7 @@ class SnapshotViewTests(unittest.TestCase):
                 "source_type": "file",
                 "source_name": "round-one.pgn",
                 "status": "live",
+                "engine": "nnue",
                 "counts": {
                     "total": 4,
                     "queued": 1,

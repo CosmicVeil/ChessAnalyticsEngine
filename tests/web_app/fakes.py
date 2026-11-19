@@ -39,7 +39,12 @@ class FakeAnalysisStore:
         self.unmatched_results: list[tuple[object, dict[str, Any]]] = []
         self._next_event_id = 1
 
-    def create_queued_job(self, source: SpooledSource) -> JobSnapshot:
+    def create_queued_job(
+        self,
+        source: SpooledSource,
+        owner_id: uuid.UUID | None = None,
+        engine: str = "nnue",
+    ) -> JobSnapshot:
         now = datetime.now(UTC)
         job = JobSnapshot(
             id=uuid.uuid4(),
@@ -54,6 +59,8 @@ class FakeAnalysisStore:
             created_at=now,
             updated_at=now,
             completed_at=None,
+            owner_id=owner_id,
+            engine=engine,
         )
         self.jobs[job.id] = job
         self.sources[job.id] = source
@@ -87,6 +94,7 @@ class FakeAnalysisStore:
                 claimed_by=worker_id,
                 lease_expires_at=now + lease_duration,
                 attempt_count=attempt_count,
+                engine=job.engine,
             )
             self.claims[job.id] = claim
             updated = replace(job, status="parsing", updated_at=now)
@@ -294,6 +302,15 @@ class FakeAnalysisStore:
 
     def get_job(self, job_id: uuid.UUID) -> JobSnapshot | None:
         return self.jobs.get(job_id)
+
+    def list_jobs_for_user(
+        self, owner_id: uuid.UUID, limit: int = 50
+    ) -> tuple[JobSnapshot, ...]:
+        return tuple(sorted(
+            (job for job in self.jobs.values() if job.owner_id == owner_id),
+            key=lambda job: (job.created_at, job.id),
+            reverse=True,
+        )[:limit])
 
     def latest_event_id(self, job_id: uuid.UUID) -> int:
         return max(
