@@ -53,6 +53,11 @@ class FrontendPageTests(unittest.TestCase):
             self.assertIn(copy, page)
         self.assertNotIn(b"Coming soon", page)
         self.assertIn(b'<input type="url" name="lichess_url" inputmode="url"', page)
+        # The size hint and client-side check come from config, not hard-coded copy.
+        self.assertIn(b'data-max-upload-bytes="20971520"', page)
+        self.assertIn(b'data-max-upload-label="20 MiB"', page)
+        self.assertIn(b"up to 20 MiB", page)
+        self.assertNotIn(b"4 GiB", page)
 
         job = self.store.create_queued_job(SpooledSource("paste", "pgn", Path("/tmp/example")), owner, "nnue")
         analysis = self.client.get(f"/analyses/{job.id}")

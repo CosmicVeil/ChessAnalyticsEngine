@@ -45,6 +45,7 @@ dependencies = [
     { name = "chess" },
     { name = "confluent-kafka" },
     { name = "flask" },
+    { name = "gunicorn" },
     { name = "pandas" },
     { name = "pandas-stubs" },
     { name = "psycopg", extra = ["binary"] },
@@ -60,6 +61,7 @@ requires-dist = [
     { name = "chess", specifier = ">=1.11.2" },
     { name = "confluent-kafka", specifier = ">=2.13.0" },
     { name = "flask", specifier = ">=3.1.2" },
+    { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "pandas-stubs", specifier = "~=3.0.3" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9" },
@@ -246,6 +248,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/d8/8cba31036a4caae448087ba5d150660ab03b4a0f54d9150f6495a3be7262/greenlet-3.5.4-cp315-cp315t-musllinux_1_2_x86_64.whl", hash = "sha256:60e0bc961d367df506660e9ac0177a76bc6d81305300704b0977d1634f76efe2", size = 1701012, upload-time = "2026-07-22T11:51:23.17Z" },
     { url = "https://files.pythonhosted.org/packages/e3/cd/3f77a4cce3bae631b08eb52f53a82a976669600337e21dfdba811cb50267/greenlet-3.5.4-cp315-cp315t-win_amd64.whl", hash = "sha256:f680e549edb3eaf21eea4e7fe101e15ec180c74b7879ab46adc080f22d4015d2", size = 251977, upload-time = "2026-07-22T11:41:38.125Z" },
     { url = "https://files.pythonhosted.org/packages/93/e8/65e8707d00fe2a49bf12f609a9b2b39ba6dd23c2810eacad877c4fc94bfe/greenlet-3.5.4-cp315-cp315t-win_arm64.whl", hash = "sha256:08fc36de8442d5c3e95b044550dbea9bf144d31ec0cc58e36fb241cb6ef6a994", size = 250538, upload-time = "2026-07-22T11:40:17.985Z" },
+]
+
+[[package]]
+name = "gunicorn"
+version = "27.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/fc/7fd4bbebc1d17394a5c98f0ef565da3341dbb664748d1bebedefead356ee/gunicorn-27.0.1.tar.gz", hash = "sha256:b1514965361c8b7e8107a80aa2a92636878df1ccfac6dd204a676426e04d9e3e", size = 876901, upload-time = "2026-11-12T22:41:11.334Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f7/46/19ce73424bc4bcac3f0c104950fa776abdfa4515f25104916a62b63b672a/gunicorn-27.0.1-py3-none-any.whl", hash = "sha256:378b26b9a38adcf4592f28828233c1716acc55e833ea06bf48719782efaa0d10", size = 263696, upload-time = "2026-11-12T22:41:09.798Z" },
 ]
 
 [[package]]

@@ -9,11 +9,12 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from functools import wraps
 
-from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from webapp.domain import AccountSnapshot
 from webapp.models import ANALYSIS_ENGINES
+from webapp.ratelimit import rate_limited_message
 
 
 auth = Blueprint("auth", __name__)
@@ -91,12 +92,43 @@ def owns_job(job_id: uuid.UUID):
     return job
 
 
+def throttle_client_ip(scope: str, limit: int, window_seconds: int, mode: str, action: str):
+    """Count one form POST for the client IP; return a 429 page once over the limit.
+
+    Every attempt counts, successful or not, and before the password is
+    hashed, so a flood costs the server one counter upsert per request.
+    """
+    if not current_app.extensions["web_settings"].rate_limits_enabled:
+        return None
+    key = f"{scope}:ip:{request.remote_addr or 'unknown'}"
+    try:
+        decision = current_app.extensions["web_dependencies"].rate_limiter.hit(key, limit, window_seconds)
+    except Exception:
+        return render_template("auth.html", mode=mode, error="The service is temporarily unavailable. Please try again shortly."), 503
+    if decision.allowed:
+        return None
+    response = make_response(
+        render_template("auth.html", mode=mode, error=rate_limited_message(action, decision.retry_after)), 429
+    )
+    response.headers["Retry-After"] = str(decision.retry_after)
+    return response
+
+
 @auth.route("/create-account", methods=["GET", "POST"])
 def create_account():
     if g.current_user is not None:
         return redirect(url_for("pages.analyze"))
     error = None
     if request.method == "POST":
+        limited = throttle_client_ip(
+            "create-account",
+            current_app.extensions["web_settings"].account_creations_per_hour,
+            3600,
+            "create",
+            "account creation attempts",
+        )
+        if limited is not None:
+            return limited
         email = request.form.get("email", "").strip().lower()
         display_name = request.form.get("display_name", "").strip()
         password = request.form.get("password", "")
@@ -135,6 +167,15 @@ def sign_in():
         return redirect(url_for("pages.analyze"))
     error = None
     if request.method == "POST":
+        limited = throttle_client_ip(
+            "sign-in",
+            current_app.extensions["web_settings"].sign_in_attempts_per_15_min,
+            15 * 60,
+            "signin",
+            "sign-in attempts",
+        )
+        if limited is not None:
+            return limited
         account = account_store().get_account_by_email(request.form.get("email", "").strip().lower())
         if not valid_csrf():
             error = "Your form expired. Please try again."
@@ -157,4 +198,4 @@ def sign_out():
     return redirect(url_for("pages.landing"))
 
 
-__all__ = ["MemoryAccountStore", "auth", "csrf_token", "login_required", "owns_job", "valid_csrf"]
+__all__ = ["MemoryAccountStore", "auth", "csrf_token", "login_required", "owns_job", "throttle_client_ip", "valid_csrf"]

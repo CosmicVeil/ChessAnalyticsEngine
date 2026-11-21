@@ -45,9 +45,29 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.kafka_bootstrap_servers, "localhost:19092")
         self.assertEqual(settings.kafka_web_result_group, "chess-web-results-v1")
         self.assertEqual(settings.pgn_spool_directory, Path(".runtime/pgn-spool"))
-        self.assertEqual(settings.max_pgn_upload_bytes, 4 * 1024**3)
+        self.assertEqual(settings.max_pgn_upload_bytes, 20 * 1024**2)
         self.assertEqual(settings.max_pasted_pgn_bytes, 10 * 1024**2)
         self.assertEqual(settings.secret_key, "development-only-change-me")
+        self.assertFalse(settings.session_cookie_secure)
+
+    def test_settings_parse_session_cookie_secure(self):
+        for value, expected in (
+            ("true", True), ("1", True), ("YES", True), ("on", True),
+            ("false", False), ("0", False), ("no", False), ("off", False),
+        ):
+            with self.subTest(value=value):
+                settings = Settings.from_env(
+                    {"DATABASE_URL": DATABASE_URL, "SESSION_COOKIE_SECURE": value}
+                )
+                self.assertIs(settings.session_cookie_secure, expected)
+
+    def test_settings_reject_invalid_session_cookie_secure(self):
+        with self.assertRaisesRegex(
+            ValueError, r"^SESSION_COOKIE_SECURE must be true or false$"
+        ):
+            Settings.from_env(
+                {"DATABASE_URL": DATABASE_URL, "SESSION_COOKIE_SECURE": "maybe"}
+            )
 
     def test_settings_reject_non_integer_limits(self):
         for variable in ("MAX_PGN_UPLOAD_BYTES", "MAX_PASTED_PGN_BYTES"):
@@ -92,6 +112,8 @@ class AppFactoryTests(unittest.TestCase):
         app = create_app(settings=settings, dependencies=dependencies)
 
         self.assertEqual(app.config["SECRET_KEY"], "test-secret")
+        self.assertFalse(app.config["SESSION_COOKIE_SECURE"])
+        self.assertEqual(app.config["SESSION_COOKIE_SAMESITE"], "Lax")
         self.assertIs(app.extensions["web_dependencies"].store, store)
         self.assertIs(
             app.extensions["web_dependencies"].spool_service, spool_service
@@ -132,6 +154,33 @@ assert "xgboost" not in sys.modules
             0,
             f"stdout:\n{completed.stdout}\nstderr:\n{completed.stderr}",
         )
+
+
+class SessionCookieTests(unittest.TestCase):
+    def test_secure_setting_marks_session_cookie_secure(self):
+        app = create_app(
+            settings=Settings(
+                database_url=DATABASE_URL,
+                secret_key="test-secret",
+                session_cookie_secure=True,
+            ),
+            dependencies=WebDependencies(
+                store=object(), spool_service=object(), health_probe=object()
+            ),
+        )
+
+        @app.get("/_set-session")
+        def set_session():
+            from flask import session
+
+            session["probe"] = "1"
+            return "ok"
+
+        response = app.test_client().get("/_set-session")
+        cookie = response.headers["Set-Cookie"]
+        self.assertIn("Secure", cookie)
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=Lax", cookie)
 
 
 class DatabaseTests(unittest.TestCase):

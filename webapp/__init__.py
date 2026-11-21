@@ -1,9 +1,11 @@
 """Flask application factory for the analysis adapter."""
 
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from webapp.config import Settings
 from webapp.domain import WebDependencies
+from webapp.spool import MULTIPART_OVERHEAD_BYTES
 
 
 def create_app(
@@ -18,17 +20,32 @@ def create_app(
     )
 
     app = Flask(__name__)
+    if resolved_settings.trust_proxy_headers:
+        # Behind Caddy, REMOTE_ADDR is the proxy; take the client address
+        # from the single X-Forwarded-For hop Caddy appends. Never enabled
+        # without a proxy, or clients could forge their IP.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
     app.config.from_mapping(
         DATABASE_URL=resolved_settings.database_url,
         KAFKA_BOOTSTRAP_SERVERS=resolved_settings.kafka_bootstrap_servers,
         KAFKA_WEB_RESULT_GROUP=resolved_settings.kafka_web_result_group,
         PGN_SPOOL_DIRECTORY=resolved_settings.pgn_spool_directory,
-        MAX_CONTENT_LENGTH=resolved_settings.max_pgn_upload_bytes,
+        # Whole-request cap, checked before the body is read. SpoolService
+        # enforces the exact per-file limit; the overhead keeps an at-limit
+        # file's multipart envelope from tripping this first.
+        MAX_CONTENT_LENGTH=resolved_settings.max_pgn_upload_bytes
+        + MULTIPART_OVERHEAD_BYTES,
+        MAX_PGN_UPLOAD_BYTES=resolved_settings.max_pgn_upload_bytes,
         MAX_PASTED_PGN_BYTES=resolved_settings.max_pasted_pgn_bytes,
         SECRET_KEY=resolved_settings.secret_key,
+        # Secure keeps the session cookie off plain HTTP; it must stay off for
+        # local http://localhost development, so production opts in.
+        SESSION_COOKIE_SECURE=resolved_settings.session_cookie_secure,
+        SESSION_COOKIE_SAMESITE="Lax",
     )
     from webapp.database import create_session_factory
     from webapp.lichess import LichessStudyClient
+    from webapp.ratelimit import MemoryRateLimiter, PostgresRateLimiter
     from webapp.repository import SqlAlchemyAnalysisStore
     from webapp.services import AdapterHealthProbe
     from webapp.spool import SpoolService
@@ -50,6 +67,14 @@ def create_app(
         account_store=supplied_dependencies.account_store,
         lichess_client=supplied_dependencies.lichess_client
         or LichessStudyClient(resolved_settings.lichess_api_token),
+        # Counters must be shared by all gunicorn workers, so they live next
+        # to the real store; injected test stores get a per-process fallback.
+        rate_limiter=supplied_dependencies.rate_limiter
+        or (
+            PostgresRateLimiter(sessions)
+            if supplied_dependencies.store is None
+            else MemoryRateLimiter()
+        ),
     )
     app.extensions["web_settings"] = resolved_settings
     app.extensions["web_dependencies"] = resolved_dependencies

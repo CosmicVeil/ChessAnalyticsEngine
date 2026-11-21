@@ -117,6 +117,48 @@ class ApiTests(unittest.TestCase):
             422,
         )
 
+    def _post_file(self, content: bytes):
+        return self.client.post(
+            "/api/analyses",
+            data={"csrf_token": self.csrf, "engine": "nnue", "pgn_file": (io.BytesIO(content), "big.pgn")},
+        )
+
+    def test_file_exactly_at_upload_limit_is_accepted(self):
+        content = PGN.encode().ljust(1024, b"\n")
+        self.assertEqual(len(content), 1024)
+
+        response = self._post_file(content)
+
+        self.assertEqual(response.status_code, 202)
+
+    def test_file_just_over_upload_limit_is_a_structured_error(self):
+        # Fits inside MAX_CONTENT_LENGTH's multipart allowance, so the spool's
+        # exact per-file check is what rejects it.
+        response = self._post_file(PGN.encode().ljust(1025, b"\n"))
+
+        self.assertEqual(response.status_code, 413)
+        error = response.get_json()["error"]
+        self.assertEqual(error["code"], "source_too_large")
+        self.assertEqual(error["limit"], 1024)
+        self.assertIn("1,024 bytes", error["message"])
+        self.assertEqual(list(Path(self.temporary.name).iterdir()), [])
+
+    def test_request_over_max_content_length_is_json_not_html(self):
+        # Far over the limit: Werkzeug rejects it before the view runs.
+        response = self._post_file(b"x" * (200 * 1024))
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.mimetype, "application/json")
+        self.assertEqual(
+            response.get_json()["error"],
+            {
+                "code": "source_too_large",
+                "message": "PGN files can be at most 1,024 bytes.",
+                "limit": 1024,
+            },
+        )
+        self.assertEqual(list(Path(self.temporary.name).iterdir()), [])
+
     def _post_lichess(self, url="https://lichess.org/study/abcdEFGH/chap1234#12", engine="nnue"):
         return self.client.post(
             "/api/analyses", data={"csrf_token": self.csrf, "engine": engine, "lichess_url": url}

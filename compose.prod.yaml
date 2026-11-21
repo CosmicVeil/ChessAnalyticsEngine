@@ -1,0 +1,115 @@
+# Production overrides for a single public VM. Layer on top of compose.yaml:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+#
+# Requires a .env next to this file (never committed) with:
+#   DOMAIN=chess.example.com
+#   SECRET_KEY=<python -c "import secrets; print(secrets.token_urlsafe(64))">
+#   POSTGRES_PASSWORD=<another long random value>
+#
+# What changes versus local development:
+# - Only Caddy is reachable from the internet (80/443, automatic HTTPS).
+#   Postgres, Redpanda, Flask, and the console publish no host ports.
+# - Flask runs under gunicorn instead of the single-process dev server.
+# - Secrets have no fallbacks: compose refuses to start if one is missing.
+# - The Redpanda console only starts with --profile debug, bound to
+#   127.0.0.1 so it is reachable through an SSH tunnel, not the internet.
+
+x-prod-env: &prod-env
+  DATABASE_URL: postgresql+psycopg://chess:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/chess_analytics
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+  SESSION_COOKIE_SECURE: "true"
+  # 20 MiB: bounds disk use and Stockfish time per upload on the public site.
+  MAX_PGN_UPLOAD_BYTES: "20971520"
+  # Caddy overwrites X-Forwarded-For, so the client IP used by rate limits
+  # can be read from it. Never set this where Flask is reachable directly.
+  TRUST_PROXY_HEADERS: "true"
+
+services:
+  postgres:
+    environment:
+      # Postgres only applies this when it first initialises an empty volume.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports: !reset []
+
+  redpanda-0:
+    ports: !reset []
+
+  console:
+    profiles: [debug]
+    ports: !override
+      - 127.0.0.1:8080:8080
+
+  migrate:
+    environment: *prod-env
+
+  web:
+    environment: *prod-env
+    # gthread: each open SSE stream occupies one thread (it sleeps between
+    # polls), so threads, not processes, bound concurrent live viewers:
+    # 2 workers x 16 threads = 32 simultaneous streams + requests.
+    # gunicorn's --timeout is a worker heartbeat under gthread, so long-lived
+    # streams and slow multi-GB uploads are not killed by it.
+    command:
+      - gunicorn
+      - --bind=0.0.0.0:5000
+      - --worker-class=gthread
+      - --workers=2
+      - --threads=16
+      - --timeout=120
+      - --access-logfile=-
+      - webapp:create_app()
+    ports: !reset []
+
+  ingestion-worker:
+    environment: *prod-env
+
+  result-worker:
+    environment: *prod-env
+
+  pipeline:
+    environment: *prod-env
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    networks:
+      - redpanda_network
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+  # Nightly pg_dump to ./backups on the host (7-day retention by default).
+  # Restore steps are in the README. Run one now with:
+  #   docker compose -f compose.yaml -f compose.prod.yaml run --rm postgres-backup --once
+  postgres-backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    networks:
+      - redpanda_network
+    entrypoint: ["/bin/sh", "/usr/local/bin/pg-backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: chess
+      PGDATABASE: chess_analytics
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./infra/pg-backup.sh:/usr/local/bin/pg-backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  caddy-data: null
+  caddy-config: null

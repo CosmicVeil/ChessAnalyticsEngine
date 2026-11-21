@@ -376,6 +376,18 @@ class UnmatchedResult(Base):
     )
 
 
+class RateLimitCounter(Base):
+    """Hits for one rate-limit key in one fixed time window."""
+
+    __tablename__ = "rate_limit_counters"
+
+    key: Mapped[str] = mapped_column(sa.String(255), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), primary_key=True
+    )
+    hits: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+
+
 __all__ = [
     "ANALYSIS_ENGINES",
     "GAME_STATUSES",
@@ -396,6 +408,7 @@ __all__ = [
     "AnalysisResult",
     "Base",
     "JobEvent",
+    "RateLimitCounter",
     "UnmatchedResult",
     "User",
 ]

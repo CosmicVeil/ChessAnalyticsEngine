@@ -10,11 +10,24 @@ from typing import BinaryIO
 from webapp.domain import SpooledSource
 
 
+# Room for the multipart boundary, part headers, and small form fields
+# (csrf_token, engine) around the file, so a file exactly at the upload limit
+# still fits in Flask's whole-request MAX_CONTENT_LENGTH.
+MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
+
+def describe_byte_limit(limit: int) -> str:
+    """Render a byte limit for people: whole MiB when it divides evenly."""
+    if limit >= 1024**2 and limit % 1024**2 == 0:
+        return f"{limit // 1024**2} MiB"
+    return f"{limit:,} bytes"
+
+
 class SourceTooLarge(ValueError):
     """Raised after a source exceeds its configured byte limit."""
 
     def __init__(self, limit: int) -> None:
-        super().__init__(f"PGN source exceeds the {limit}-byte limit")
+        super().__init__(f"PGN source exceeds the {describe_byte_limit(limit)} limit.")
         self.limit = limit
 
 
@@ -111,4 +124,9 @@ def _display_name(value: str) -> str:
     return (name or "uploaded.pgn")[:255]
 
 
-__all__ = ["SourceTooLarge", "SpoolService"]
+__all__ = [
+    "MULTIPART_OVERHEAD_BYTES",
+    "SourceTooLarge",
+    "SpoolService",
+    "describe_byte_limit",
+]
