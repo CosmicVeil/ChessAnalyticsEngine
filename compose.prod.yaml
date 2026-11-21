@@ -20,6 +20,9 @@ x-prod-env: &prod-env
   SESSION_COOKIE_SECURE: "true"
   # 20 MiB: bounds disk use and Stockfish time per upload on the public site.
   MAX_PGN_UPLOAD_BYTES: "20971520"
+  # Caddy overwrites X-Forwarded-For, so the client IP used by rate limits
+  # can be read from it. Never set this where Flask is reachable directly.
+  TRUST_PROXY_HEADERS: "true"
 
 services:
   postgres:
@@ -83,6 +86,29 @@ services:
       - caddy-config:/config
     depends_on:
       - web
+
+  # Nightly pg_dump to ./backups on the host (7-day retention by default).
+  # Restore steps are in the README. Run one now with:
+  #   docker compose -f compose.yaml -f compose.prod.yaml run --rm postgres-backup --once
+  postgres-backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    networks:
+      - redpanda_network
+    entrypoint: ["/bin/sh", "/usr/local/bin/pg-backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: chess
+      PGDATABASE: chess_analytics
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./infra/pg-backup.sh:/usr/local/bin/pg-backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   caddy-data: null

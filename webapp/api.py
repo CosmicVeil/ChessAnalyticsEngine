@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from flask import Blueprint, Response, current_app, g, jsonify, request, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -22,6 +23,7 @@ from webapp.spool import SourceTooLarge, describe_byte_limit
 from webapp.sse import stream_events
 from webapp.auth import login_required, owns_job, valid_csrf
 from webapp.models import ANALYSIS_ENGINES
+from webapp.ratelimit import check_analysis_quota
 
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -33,6 +35,35 @@ def _error(code: str, message: str, status: int, **details):
     body = {"error": {"code": code, "message": message}}
     body["error"].update(details)
     return jsonify(body), status
+
+
+def _rate_limited(message: str, retry_after: int):
+    response, status = _error("rate_limited", message, 429, retry_after=retry_after)
+    response.headers["Retry-After"] = str(retry_after)
+    return response, status
+
+
+def _analysis_quota_response():
+    """Return a 429/503 response when the signed-in user may not start a job."""
+    settings = current_app.extensions["web_settings"]
+    if not settings.rate_limits_enabled:
+        return None
+    now = datetime.now(UTC)
+    try:
+        usage = _dependencies().store.analysis_quota_usage(
+            g.current_user.id, now - timedelta(hours=1)
+        )
+    except Exception:
+        return _error("database_unavailable", "PostgreSQL is unavailable.", 503)
+    decision = check_analysis_quota(
+        usage,
+        per_hour=settings.analyses_per_hour,
+        max_active=settings.max_active_analyses,
+        now=now,
+    )
+    if decision.allowed:
+        return None
+    return _rate_limited(decision.message, decision.retry_after)
 
 
 @api.app_errorhandler(RequestEntityTooLarge)
@@ -53,6 +84,12 @@ def request_too_large(_error_value):
 def create_analysis():
     if not valid_csrf():
         return _error("invalid_csrf", "Your session expired. Refresh and try again.", 403)
+    # Checked before spooling, the Lichess download, and job creation, so a
+    # rejected request never reaches Stockfish. Check-then-insert is not
+    # atomic: parallel requests can overshoot by a job or two (a soft limit).
+    limited = _analysis_quota_response()
+    if limited is not None:
+        return limited
     uploaded = request.files.get("pgn_file")
     has_file = uploaded is not None and bool(uploaded.filename)
     pasted = request.form.get("pgn_text")

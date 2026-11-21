@@ -147,10 +147,15 @@ if (form) {
     status.textContent = "Stamping source and opening a durable job…";
     try {
       const response = await fetch("/api/analyses", { method: "POST", body: data });
-      // The proxy's own 413 has no JSON body, so don't let parsing mask it.
+      // A proxy-generated error page is not JSON; fall back to a readable line.
       const body = await response.json().catch(() => ({}));
-      if (response.status === 413 && !body.error) throw new Error(tooLargeMessage);
-      if (!response.ok) throw new Error(body.error?.message || "The source was not accepted.");
+      if (!response.ok) {
+        if (response.status === 413 && !body.error) throw new Error(tooLargeMessage);
+        throw new Error(
+          body.error?.message
+            || (response.status === 429 ? "Too many requests. Please wait a few minutes and try again." : "The source was not accepted."),
+        );
+      }
       status.textContent = "Accepted. Opening the live ledger…";
       liveController?.close();
       liveRoot.dataset.jobId = body.job.id;

@@ -1,6 +1,7 @@
 """Flask application factory for the analysis adapter."""
 
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from webapp.config import Settings
 from webapp.domain import WebDependencies
@@ -19,6 +20,11 @@ def create_app(
     )
 
     app = Flask(__name__)
+    if resolved_settings.trust_proxy_headers:
+        # Behind Caddy, REMOTE_ADDR is the proxy; take the client address
+        # from the single X-Forwarded-For hop Caddy appends. Never enabled
+        # without a proxy, or clients could forge their IP.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
     app.config.from_mapping(
         DATABASE_URL=resolved_settings.database_url,
         KAFKA_BOOTSTRAP_SERVERS=resolved_settings.kafka_bootstrap_servers,
@@ -39,6 +45,7 @@ def create_app(
     )
     from webapp.database import create_session_factory
     from webapp.lichess import LichessStudyClient
+    from webapp.ratelimit import MemoryRateLimiter, PostgresRateLimiter
     from webapp.repository import SqlAlchemyAnalysisStore
     from webapp.services import AdapterHealthProbe
     from webapp.spool import SpoolService
@@ -60,6 +67,14 @@ def create_app(
         account_store=supplied_dependencies.account_store,
         lichess_client=supplied_dependencies.lichess_client
         or LichessStudyClient(resolved_settings.lichess_api_token),
+        # Counters must be shared by all gunicorn workers, so they live next
+        # to the real store; injected test stores get a per-process fallback.
+        rate_limiter=supplied_dependencies.rate_limiter
+        or (
+            PostgresRateLimiter(sessions)
+            if supplied_dependencies.store is None
+            else MemoryRateLimiter()
+        ),
     )
     app.extensions["web_settings"] = resolved_settings
     app.extensions["web_dependencies"] = resolved_dependencies

@@ -178,6 +178,8 @@ The whole stack fits on one Linux VM with Docker (4 vCPU / 8 GB minimum: Stockfi
 - PostgreSQL, Redpanda, and Flask publish **no host ports**. The Redpanda console starts only with `--profile debug`, bound to `127.0.0.1:8080`; reach it with `ssh -L 8080:localhost:8080 <server>`.
 - PGN file uploads are capped at **20 MiB** (`MAX_PGN_UPLOAD_BYTES`), so one visitor can't fill the disk or monopolise Stockfish. Caddy rejects request bodies over 21 MiB as a backstop; anything between is answered by Flask with a JSON `413 source_too_large` error that the upload form shows, and the form checks the file size before sending.
 - `SECRET_KEY` and `POSTGRES_PASSWORD` have **no fallbacks**: compose refuses to start without them. Session cookies are marked `Secure`.
+- **Rate limits** protect the expensive paths: sign-in and account creation per client IP, analysis creation per account (per hour and concurrently running). Counters live in PostgreSQL so both gunicorn workers share them; `TRUST_PROXY_HEADERS=true` lets Flask read the client IP from the `X-Forwarded-For` hop Caddy appends. Over the limit, the API answers `429` with `{"error": {"code": "rate_limited", "message": ..., "retry_after": N}}` and a `Retry-After` header; the sign-in and create-account pages show the message inline.
+- **Nightly backups**: the `postgres-backup` service runs `pg_dump` at `BACKUP_HOUR_UTC` (default 03:00 UTC) into `./backups/chess_analytics-<timestamp>.sql.gz` on the host and keeps `BACKUP_RETENTION_DAYS` (default 7) days.
 
 On the server, point the domain's DNS A record at it, open ports 80 and 443, copy trained artifacts into `ml-model/models/`, then create `.env` (git-ignored) next to `compose.yaml`:
 
@@ -191,7 +193,30 @@ POSTGRES_PASSWORD=<a second, different random value>
 docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 ```
 
-`POSTGRES_PASSWORD` is applied only when Postgres initialises an empty volume, so set it before the first start (or change it later with `ALTER USER chess PASSWORD ...`). Inspect the database with `docker compose exec postgres psql -U chess chess_analytics`. Back up with a scheduled `docker compose exec -T postgres pg_dump -U chess chess_analytics | gzip > backup.sql.gz`; a single VM without backups is this setup's main risk.
+`POSTGRES_PASSWORD` is applied only when Postgres initialises an empty volume, so set it before the first start (or change it later with `ALTER USER chess PASSWORD ...`). Inspect the database with `docker compose exec postgres psql -U chess chess_analytics`.
+
+### Backups and restore
+
+Backups land in `./backups` (git-ignored, files readable only by root). They sit on the same disk as the database, so copy them off the VM too (for example a nightly `rsync` or `rclone` to object storage); a single VM whose only backups are local is still this setup's main risk. Take one on demand with:
+
+```bash
+docker compose -f compose.yaml -f compose.prod.yaml run --rm postgres-backup --once
+```
+
+To restore a dump (this replaces the current database):
+
+```bash
+# 1. Stop everything that writes to the database.
+docker compose -f compose.yaml -f compose.prod.yaml stop caddy web ingestion-worker result-worker pipeline postgres-backup
+# 2. Recreate an empty database.
+docker compose -f compose.yaml -f compose.prod.yaml exec postgres psql -U chess -d postgres -c "DROP DATABASE chess_analytics WITH (FORCE)" -c "CREATE DATABASE chess_analytics OWNER chess"
+# 3. Load the dump (pick the file you want from ./backups).
+gunzip -c backups/chess_analytics-YYYYMMDDTHHMMSSZ.sql.gz | docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres psql -v ON_ERROR_STOP=1 -U chess -d chess_analytics
+# 4. Start the stack again (migrate runs first and is a no-op if the dump is current).
+docker compose -f compose.yaml -f compose.prod.yaml up -d
+```
+
+The dump includes `alembic_version`, so migrations resume from the backed-up revision. Spooled PGN files are not in the dump; jobs that were still queued when the backup was taken can fail with a missing source and need resubmitting.
 
 ## Local setup
 
@@ -309,6 +334,13 @@ After cleanup, restart the stopped services and upload the PGN again to begin a 
 | `MAX_PASTED_PGN_BYTES` | Pasted-text limit | 10 MiB |
 | `SECRET_KEY` | Flask secret | development value only |
 | `SESSION_COOKIE_SECURE` | Send the session cookie over HTTPS only (`true`/`false`); `compose.prod.yaml` sets `true` | `false` |
+| `TRUST_PROXY_HEADERS` | Take the client IP from the last `X-Forwarded-For` hop (Werkzeug `ProxyFix`). Only safe behind a proxy that sets that header; `compose.prod.yaml` sets `true` | `false` |
+| `RATE_LIMITS_ENABLED` | Master switch for all rate limits | `true` |
+| `SIGN_IN_ATTEMPTS_PER_15_MIN` | Sign-in form submissions per client IP per 15-minute window | `20` |
+| `ACCOUNT_CREATIONS_PER_HOUR` | Create-account form submissions per client IP per hour | `10` |
+| `ANALYSES_PER_HOUR` | Analyses one account may start in any rolling hour | `20` |
+| `MAX_ACTIVE_ANALYSES` | Unfinished (queued/parsing/live) analyses one account may have at once | `3` |
+| `BACKUP_HOUR_UTC` / `BACKUP_RETENTION_DAYS` | `postgres-backup` schedule and retention (`compose.prod.yaml` only) | `3` / `7` |
 | `CHESS_ENGINE` | Fallback engine for focused standalone/debug reporter runs; web jobs carry their own persisted choice | `xgboost` |
 | `STOCKFISH_PATH` | Stockfish binary for the Go feature extractor | `stockfish` on `PATH` |
 
@@ -317,14 +349,14 @@ After cleanup, restart the stopped services and upload the PGN again to begin a 
 | Method and path | Purpose |
 | --- | --- |
 | `GET /` | Public product overview and repository benchmark highlights |
-| `GET/POST /create-account` | Create a persisted local account and authenticated session |
-| `GET/POST /sign-in` | Sign in to an existing account |
+| `GET/POST /create-account` | Create a persisted local account and authenticated session (POST rate-limited per IP) |
+| `GET/POST /sign-in` | Sign in to an existing account (POST rate-limited per IP) |
 | `GET /evaluation` | Repository-backed model benchmark and interpretation guidance |
 | `GET /analyze` | Authenticated engine selection and PGN upload/paste workspace |
 | `GET /analyses/<job_id>` | Authenticated, owner-only restorable live job |
 | `GET/POST /profile` | Persisted preferences, usage totals, privacy information, and owned history |
 | `GET /system` | Information page (legacy route) |
-| `POST /api/analyses` | Authenticated creation of an owned file or paste analysis job |
+| `POST /api/analyses` | Authenticated creation of an owned file or paste analysis job (rate-limited per account; `429` + `Retry-After`) |
 | `GET /api/analyses/<job_id>` | Owner-only job snapshot, counters, engine, and SSE resume cursor |
 | `GET /api/analyses/<job_id>/games` | Owner-only filtered, paginated game results |
 | `GET /api/analyses/<job_id>/events` | Owner-only durable SSE updates |
@@ -344,7 +376,7 @@ The PostgreSQL tests are opt-in:
 
 ```bash
 export TEST_DATABASE_URL=postgresql+psycopg://chess:chess@localhost:15432/chess_analytics
-.venv/bin/python -m unittest tests.web_app.test_migrations_postgres tests.web_app.test_repository_postgres tests.web_app.test_adapter_integration_postgres -v
+.venv/bin/python -m unittest tests.web_app.test_migrations_postgres tests.web_app.test_repository_postgres tests.web_app.test_adapter_integration_postgres tests.web_app.test_rate_limits -v
 ```
 
 The integration test exercises submission, PGN streaming, an immediate per-game result race, idempotent replay, source-ordered API results, and resumable SSE against real PostgreSQL transactions.

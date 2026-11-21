@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from webapp.domain import (
     AccountSnapshot,
+    AnalysisQuotaUsage,
     ClaimedJob,
     GameQuery,
     GameSnapshot,
@@ -37,6 +38,7 @@ from webapp.models import (
     JOB_STATUS_PARSING,
     JOB_STATUS_PARTIAL,
     JOB_STATUS_QUEUED,
+    JOB_STATUS_RECEIVED,
     AnalysisGame,
     AnalysisJob,
     AnalysisResult,
@@ -48,6 +50,12 @@ from webapp.models import (
 
 TERMINAL_JOB_STATUSES = frozenset(
     {JOB_STATUS_COMPLETED, JOB_STATUS_PARTIAL, JOB_STATUS_FAILED}
+)
+ACTIVE_JOB_STATUSES = (
+    JOB_STATUS_RECEIVED,
+    JOB_STATUS_QUEUED,
+    JOB_STATUS_PARSING,
+    JOB_STATUS_LIVE,
 )
 JOB_UPDATED = "job.updated"
 GAME_UPDATED = "game.updated"
@@ -434,6 +442,20 @@ class SqlAlchemyAnalysisStore:
                 .limit(max(1, min(limit, 100)))
             ).all()
             return tuple(_job_snapshot(job) for job in jobs)
+
+    def analysis_quota_usage(
+        self, owner_id: uuid.UUID, since: datetime
+    ) -> AnalysisQuotaUsage:
+        """Count an owner's recent and unfinished jobs in one indexed query."""
+        recent = AnalysisJob.created_at >= since
+        statement = sa.select(
+            sa.func.count().filter(recent),
+            sa.func.count().filter(AnalysisJob.status.in_(ACTIVE_JOB_STATUSES)),
+            sa.func.min(AnalysisJob.created_at).filter(recent),
+        ).where(AnalysisJob.owner_id == owner_id)
+        with self._sessions() as session:
+            recent_jobs, active_jobs, oldest = session.execute(statement).one()
+        return AnalysisQuotaUsage(recent_jobs, active_jobs, oldest)
 
     def latest_event_id(self, job_id: uuid.UUID) -> int:
         statement = sa.select(sa.func.max(JobEvent.id)).where(

@@ -29,6 +29,15 @@ class AccountSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class AnalysisQuotaUsage:
+    """How many analyses an account started recently and still has running."""
+
+    recent_jobs: int
+    active_jobs: int
+    oldest_recent_created_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class SpooledSource:
     source_type: str
     source_name: str
@@ -263,6 +272,10 @@ class AnalysisStore(Protocol):
         self, owner_id: uuid.UUID, limit: int = 50
     ) -> tuple[JobSnapshot, ...]: ...
 
+    def analysis_quota_usage(
+        self, owner_id: uuid.UUID, since: datetime
+    ) -> AnalysisQuotaUsage: ...
+
     def latest_event_id(self, job_id: uuid.UUID) -> int: ...
 
     def list_games(
@@ -283,10 +296,12 @@ class WebDependencies:
     health_probe: object | None = None
     account_store: object | None = None
     lichess_client: object | None = None
+    rate_limiter: object | None = None
 
 
 __all__ = [
     "AccountSnapshot",
+    "AnalysisQuotaUsage",
     "AnalysisStore",
     "ClaimedJob",
     "GameQuery",
